@@ -3,6 +3,17 @@
 All notable, community-facing changes to ImperialReminder are recorded here in plain language.
 For the technical, commit-level history, see git.
 
+## [Unreleased] - 2026-08-22 (admin panel pickers)
+
+### Changed
+- **A refused pick in the admin panel no longer stays selected.** When a channel, role or
+  option is turned down (wrong permissions, a role the bot cannot manage, an invalid choice),
+  the picker now resets to what is actually saved, so you can pick again straight away instead
+  of having to choose something else first.
+- **Creating a role from the admin panel now reminds you where it landed.** Discord puts a new
+  role at the bottom of the role list; the confirmation says so and points you to Server
+  Settings -> Roles if it needs to sit higher.
+
 ## [Unreleased] - 2026-08-19 (where premium is explained)
 
 ### Fixed
