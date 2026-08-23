@@ -20,6 +20,7 @@ Message pattern:
 
 import json
 import time
+import uuid
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Optional
@@ -870,9 +871,13 @@ class AdminCog(commands.Cog):
                 await save_interaction.followup.send(view=notice_view, ephemeral=True)
                 try:
                     stored = list(await node.get_values(guild.id)) if node.get_values else []
+                    # Same values as before the pick, so the select must carry a new
+                    # custom id or the client keeps the rejected choice highlighted
+                    # (seen live 2026-08-22: the card re-rendered, the pick did not).
                     redraw = build_select_view(
                         node, stored, guild, on_save, on_back, on_clear_fn, back_label,
                         is_premium=premium, on_create=on_create_fn, create_label=_create_label,
+                        select_nonce=uuid.uuid4().hex[:8],
                     )
                     await save_interaction.edit_original_response(
                         view=self._rebind_session_view(session, redraw)

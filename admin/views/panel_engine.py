@@ -641,6 +641,11 @@ def build_menu_view(
     return builder.build()
 
 
+def _select_cid(node_key: str, nonce: Optional[str]) -> str:
+    base = cid("editor", "select", node_key)
+    return f"{base}:{nonce}" if nonce else base
+
+
 def build_select_view(
     node: PanelNode,
     current_values: list,
@@ -652,8 +657,15 @@ def build_select_view(
     is_premium: bool = False,
     on_create: Optional[Callable[[discord.Interaction], Awaitable[None]]] = None,
     create_label: str = "Create",
+    select_nonce: Optional[str] = None,
 ) -> discord.ui.LayoutView:
     """Build a select view for a PanelNode with kind in (role_select, channel_select, option_select).
+
+    ``select_nonce`` is appended to the select's custom id. Pass one when the view is
+    being redrawn on the SAME values it already showed (a refused pick): the Discord
+    client only re-renders a component whose payload changed, so an identical select
+    keeps the rejected choice highlighted. Callbacks are bound per component, not
+    routed by custom id, so the suffix changes nothing else.
 
     The component auto-saves on change (no explicit Save button); Back navigates
     to the parent; Clear (if provided) removes all values. ``on_create`` (if
@@ -714,7 +726,7 @@ def build_select_view(
     if node.kind == "role_select":
         component = discord.ui.RoleSelect(
             placeholder=f"Select roles for {node.label}...",
-            custom_id=cid("editor", "select", node.key),
+            custom_id=_select_cid(node.key, select_nonce),
             min_values=node.min_values,
             max_values=node.max_values,
             default_values=[discord.Object(id=int(rid)) for rid in current_values],
@@ -732,7 +744,7 @@ def build_select_view(
             effective_max = node.premium_max_values
         select_kwargs = dict(
             placeholder=f"Select channel for {node.label}...",
-            custom_id=cid("editor", "select", node.key),
+            custom_id=_select_cid(node.key, select_nonce),
             min_values=node.min_values,
             max_values=effective_max,
             default_values=[discord.Object(id=int(v)) for v in current_values],
@@ -767,7 +779,7 @@ def build_select_view(
             )
         component = discord.ui.Select(
             placeholder="Select one or more options...",
-            custom_id=cid("editor", "select", node.key),
+            custom_id=_select_cid(node.key, select_nonce),
             min_values=node.min_values,
             max_values=min(node.max_values, len(option_objects)) if option_objects else 1,
             options=option_objects,
