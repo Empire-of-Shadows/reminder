@@ -198,6 +198,13 @@ class PanelNode:
     # the dashboard category Select; "feature" renders below.
     category_group: str = "main"
 
+    # Audit section override. Audit entries normally take their section from the
+    # parent menu's key, falling back to the leaf's own key when it sits at the
+    # root. Set this when a leaf is promoted to the root (a wrapper menu with one
+    # child was removed) so its history keeps the section it always had instead
+    # of splitting the dashboard's audit filter across two names.
+    audit_section: Optional[str] = None
+
     # Tier-aware label override. When the active guild has premium and
     # premium_label is set, renderers display it instead of `label`.
     premium_label: Optional[str] = None

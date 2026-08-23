@@ -130,9 +130,12 @@ class AdminCog(commands.Cog):
     def _resolve_section(node: PanelNode, parent_node: PanelNode | None = None) -> str:
         """Best-effort section label for audit entries.
 
-        Top-level category nodes own the section name (e.g. "tictactoe").
-        Falls back to the node's own key when no parent context is available.
+        A node's explicit ``audit_section`` wins. Otherwise top-level category
+        nodes own the section name (e.g. "tictactoe"), falling back to the node's
+        own key when no parent context is available.
         """
+        if node.audit_section:
+            return node.audit_section
         if parent_node is not None and parent_node.key:
             return parent_node.key
         return node.key
@@ -855,6 +858,28 @@ class AdminCog(commands.Cog):
 
             await save_interaction.response.defer(ephemeral=True)
 
+            async def _refuse(notice_view) -> None:
+                """Send the refusal AND redraw the editor on its stored values.
+
+                Discord keeps a select's last pick highlighted until the message is
+                edited, so without the redraw a refused choice stays selected and the
+                admin has to pick something else before they can pick the right thing
+                again (owner finding, 2026-08-22). Rebuilt from what is actually saved,
+                never from the refused values.
+                """
+                await save_interaction.followup.send(view=notice_view, ephemeral=True)
+                try:
+                    stored = list(await node.get_values(guild.id)) if node.get_values else []
+                    redraw = build_select_view(
+                        node, stored, guild, on_save, on_back, on_clear_fn, back_label,
+                        is_premium=premium, on_create=on_create_fn, create_label=_create_label,
+                    )
+                    await save_interaction.edit_original_response(
+                        view=self._rebind_session_view(session, redraw)
+                    )
+                except discord.HTTPException as http_exc:
+                    logger.warning("Could not redraw select view after refusal: %s", http_exc)
+
             # Premium value check
             if node.premium_values and not await self._is_premium(guild.id):
                 blocked = [v for v in values if str(v) in node.premium_values]
@@ -864,7 +889,7 @@ class AdminCog(commands.Cog):
                         "This option requires a **Premium** subscription.\n\n"
                         "Use `/premium` to learn more about upgrading.",
                     )
-                    await save_interaction.followup.send(view=notice, ephemeral=True)
+                    await _refuse(notice)
                     return
 
             # Channel count check for non-premium
@@ -876,7 +901,7 @@ class AdminCog(commands.Cog):
                         f"Upgrade to **Premium** to select up to **{node.premium_max_values}**.\n\n"
                         "Use `/premium` to learn more about upgrading.",
                     )
-                    await save_interaction.followup.send(view=notice, ephemeral=True)
+                    await _refuse(notice)
                     return
 
             # Permission pre-check (perms declared on the node itself)
@@ -884,29 +909,20 @@ class AdminCog(commands.Cog):
                 for cid in values:
                     ok, err = check_channel_permissions(node, guild, int(cid))
                     if not ok:
-                        await save_interaction.followup.send(
-                            view=build_notice_layout("Permission Issue", err),
-                            ephemeral=True,
-                        )
+                        await _refuse(build_notice_layout("Permission Issue", err))
                         return
             elif node.kind == "role_select" and values:
                 for rid in values:
                     ok, err = check_role_permissions(node, guild, int(rid))
                     if not ok:
-                        await save_interaction.followup.send(
-                            view=build_notice_layout("Permission Issue", err),
-                            ephemeral=True,
-                        )
+                        await _refuse(build_notice_layout("Permission Issue", err))
                         return
 
             # Value-level validation against live guild state (e.g. channel-in-category).
             if node.value_validator and values:
                 err = await node.value_validator(guild, values)
                 if err:
-                    await save_interaction.followup.send(
-                        view=build_notice_layout("Invalid Selection", err),
-                        ephemeral=True,
-                    )
+                    await _refuse(build_notice_layout("Invalid Selection", err))
                     return
 
             old_vals = list(await node.get_values(guild.id)) if node.get_values else []
@@ -914,13 +930,10 @@ class AdminCog(commands.Cog):
                 success = await node.set_values(guild.id, values)
             except Exception as save_exc:
                 logger.exception("Select save failed for node=%s", node.key)
-                await save_interaction.followup.send(
-                    view=build_notice_layout(
-                        "Failed to save",
-                        f"Could not save **{node.label}**. {save_exc.__class__.__name__}",
-                    ),
-                    ephemeral=True,
-                )
+                await _refuse(build_notice_layout(
+                    "Failed to save",
+                    f"Could not save **{node.label}**. {save_exc.__class__.__name__}",
+                ))
                 return
             if success:
                 self._invalidate_guild_caches(guild.id)
@@ -943,9 +956,8 @@ class AdminCog(commands.Cog):
                 if refresh_parent:
                     await refresh_parent()
             else:
-                await save_interaction.followup.send(
-                    view=build_notice_layout("Failed to save", f"Could not save **{node.label}**."),
-                    ephemeral=True,
+                await _refuse(
+                    build_notice_layout("Failed to save", f"Could not save **{node.label}**."),
                 )
 
         async def on_back(back_interaction: discord.Interaction):
@@ -1204,11 +1216,18 @@ class AdminCog(commands.Cog):
                 if refresh_parent:
                     await refresh_parent()
                 placed = f" under **{category.name}**" if category is not None else ""
+                body = f"Created {_entity_display(entity)}{placed} and saved it to **{node.label}**."
+                if _is_role:
+                    # Discord puts a new role at the bottom of the list, under every
+                    # existing role. Where it sits decides what it outranks and whether
+                    # its colour shows, and only a person can move it.
+                    body += (
+                        "\n\nNew roles start at the bottom of the role list. If this one "
+                        "needs to sit above other roles (to outrank them, or to show its "
+                        "colour on names), move it in Server Settings -> Roles."
+                    )
                 await mi.followup.send(
-                    view=build_notice_layout(
-                        _create_label,
-                        f"Created {_entity_display(entity)}{placed} and saved it to **{node.label}**.",
-                    ),
+                    view=build_notice_layout(_create_label, body),
                     ephemeral=True,
                 )
 

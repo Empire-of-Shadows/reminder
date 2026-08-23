@@ -45,7 +45,8 @@ _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 # TTLs match the values every dashboard already used.
 _GUILDS_TTL = 300.0  # bot guild list + bot id
-_RESOURCE_TTL = 60.0  # per-guild channels/roles
+_RESOURCE_TTL = 60.0  # per-guild channels/roles/members
+_MAX_MEMBER_ENTRIES = 2000  # guild:user pairs; one page of names is a few dozen at most
 _MAX_GUILD_ENTRIES = 512  # bound on the per-guild caches (oldest evicted)
 
 
@@ -107,6 +108,10 @@ class DiscordApiCache:
 
         self._channels = _BoundedTTLMap(_MAX_GUILD_ENTRIES, _RESOURCE_TTL)
         self._roles = _BoundedTTLMap(_MAX_GUILD_ENTRIES, _RESOURCE_TTL)
+        # Single-member lookups, keyed "guild:user". Same TTL as the other per-guild
+        # resources; a miss (left the guild, bad id) is cached too so a page that shows
+        # many names does not re-ask Discord for the same absent member on every render.
+        self._members = _BoundedTTLMap(_MAX_MEMBER_ENTRIES, _RESOURCE_TTL)
         # Per-guild single-flight locks; pruned alongside the caches by virtue of
         # being recreated rarely (a lock per active guild, bounded in practice by
         # the caches above - stale locks are just idle asyncio.Lock objects).
@@ -210,6 +215,48 @@ class DiscordApiCache:
         channels = [dict(ch) for ch in raw if ch["type"] in types]
         channels.sort(key=lambda c: c["position"])
         return channels
+
+    async def guild_member(self, guild_id: str, user_id: str) -> Optional[dict]:
+        """One guild member as ``{"id", "display_name", "username"}``, or ``None``.
+
+        ``display_name`` follows discord.py's ``Member.display_name`` precedence: guild
+        nickname, then global display name, then username. A plain REST fetch that
+        needs no privileged intent. ``None`` when the member is not in the guild, the id
+        is malformed, or Discord cannot be reached - callers fall back to whatever
+        name they already hold.
+        """
+        guild_id = str(guild_id)
+        user_id = str(user_id)
+        if not user_id.isdigit():
+            return None
+        key = f"{guild_id}:{user_id}"
+        hit = self._members.get(key)
+        if hit is not None:
+            return hit or None
+        async with self._resource_locks[f"m:{key}"]:
+            hit = self._members.get(key)
+            if hit is not None:
+                return hit or None
+            if not _token():
+                return None
+            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+                resp = await _get_with_retry(
+                    client, f"{_api_base()}/guilds/{guild_id}/members/{user_id}"
+                )
+            if resp is None:
+                self._members.set(key, {})
+                return None
+            raw = resp.json()
+            user = raw.get("user") or {}
+            member = {
+                "id": str(user.get("id") or user_id),
+                "display_name": (
+                    raw.get("nick") or user.get("global_name") or user.get("username") or ""
+                ),
+                "username": user.get("username") or "",
+            }
+            self._members.set(key, member)
+            return member
 
     async def guild_text_channels(self, guild_id: str) -> List[dict]:
         """Text channels (type 0) sorted by position. Empty list on failure."""
