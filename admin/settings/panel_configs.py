@@ -209,8 +209,22 @@ SETUP_CONFIG = PanelNode(
             channel_types=[discord.ChannelType.text],
             min_values=1,
             max_values=1,
-            required_channel_perms=["send_messages", "embed_links"],
+            # The bot's full working set in this channel: it reads bump-bot posts
+            # (view), sends reminders and the setup nudge (send + embed), and
+            # refetches messages for WeBump's delayed edit and the empty-payload
+            # fallback (read_message_history - handler.py on_message_edit/refetch).
+            # Both refetch sites are try/except-wrapped, so a missing History perm
+            # would weaken detection SILENTLY - refuse it at save time instead.
+            required_channel_perms=[
+                "view_channel",
+                "send_messages",
+                "embed_links",
+                "read_message_history",
+            ],
         ),
+        # Deliberately NO requires_role_manage on bump_role: the bot only MENTIONS
+        # this role in reminders - it never assigns or edits it - and the hierarchy
+        # rule would wrongly reject above-bot roles an admin may want pinged.
         "bump_role": PanelNode(
             key="bump_role",
             label="Bump Role",
@@ -236,7 +250,17 @@ SETUP_CONFIG = PanelNode(
             channel_types=[discord.ChannelType.text],
             min_values=1,
             max_values=1,
-            required_channel_perms=["send_messages", "embed_links"],
+            # Countdown embed lifecycle: send the new embed (send + embed) and
+            # fetch-then-delete the previous one (read_message_history -
+            # embed_manager._delayed_update). Without History the old embed cannot
+            # be fetched, so stale countdowns pile up with only a warning log -
+            # refuse the channel at save time instead.
+            required_channel_perms=[
+                "view_channel",
+                "send_messages",
+                "embed_links",
+                "read_message_history",
+            ],
         ),
     },
 )

@@ -3,6 +3,24 @@
 All notable, community-facing changes to ImperialReminder are recorded here in plain language.
 For the technical, commit-level history, see git.
 
+## [Unreleased] - 2026-08-24 (picking a channel checks everything the bot needs)
+
+### Fixed
+- **Your data from a server you have left can be exported and erased again.** The privacy
+  page has always listed such servers in its picker (shown without a name), because your
+  stored records outlive your membership - but choosing one then failed with "not a member",
+  so the download and delete buttons never worked for exactly those rows. They do now;
+  servers where you have no data still refuse as before.
+
+### Changed
+- **Choosing a Bump Channel or Timers Channel in the admin panel now checks every permission
+  the bot really needs there.** Besides sending messages and embeds, the bot has to read the
+  channel's message history - that is how it catches bump bots that edit their message just
+  after posting (WeBump does this), and how it clears the old countdown embed instead of
+  leaving stale ones piling up. Before, picking a channel where history reading was blocked
+  looked fine and those features quietly stopped working; now the panel names the exact
+  missing permission the moment you pick the channel, so you can fix it right away.
+
 ## [Unreleased] - 2026-08-22 (admin panel pickers)
 
 ### Changed

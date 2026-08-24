@@ -15,7 +15,7 @@ Four engine masters in `EmpireSystems/` are vendored into this repo. Files carry
 | Engine | Vendored into | Sync tool | Bot-owned seam |
 |---|---|---|---|
 | storage_engine | `storage/` (48 files) | `python EmpireSystems/tools/sync_storage_engine.py --bot reminder` | `storage/settings/{bindings,collections}.py`, `config_manager.py`, `audit_log.py`, `setup_gatekeeper.py`, `sub_systems/` |
-| admin_engine | `admin/` (33 files) | `python EmpireSystems/tools/sync_admin_engine.py --bot reminder` | `admin/settings/{bindings,panel_configs,panel_branding,role_auth}.py` |
+| admin_engine | `admin/` (33 files) | `python EmpireSystems/tools/sync_admin_engine.py --bot reminder` | `admin/settings/{bindings,panel_configs,panel_branding}.py` |
 | runtime_engine | `health_endpoint.py`, `startup/{phases,loader,presence}.py`, `utils/env.py` | `python EmpireSystems/tools/sync_runtime_engine.py --bot reminder` | `startup/bot.py`, `startup/sync.py` |
 | dashboard_engine | `dashboard/_engine/`, `dashboard/frontend/src/_engine/` | `python EmpireSystems/tools/sync_dashboard_engine.py --bot reminder` | `dashboard/config.py`, `db.py`, `app.py`, `auth/{dependencies,panel_role}.py`, `routers/`, `services/` |
 

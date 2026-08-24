@@ -30,19 +30,30 @@ def _parse_guild_id(guild_id: str | None) -> str | None:
     return guild_id
 
 
-def _resolve_guild_scope(session: dict, guild_id: str | None) -> str | None:
-    """Validate the scope against session membership so a user can only act on
-    servers they are actually in."""
+async def _resolve_guild_scope(
+    session: dict, guild_id: str | None, user_id: str
+) -> str | None:
+    """Validate the scope: the user must be a member of the server, OR hold
+    stored records there. Records can outlive membership (left server, stale
+    session) and ``user_guilds(with_data=true)`` deliberately lists those
+    guilds in the scope picker - so they must stay actionable here, or the
+    picker offers rows that summary/export/erase then refuse. Every query
+    downstream filters by the caller's own user id, so a non-member scope can
+    only ever reach the caller's own records."""
     gid = _parse_guild_id(guild_id)
     if gid is None:
         return None
-    member = any(str(g.get("id")) == gid for g in session.get("guilds", []))
-    if not member:
-        raise HTTPException(
-            status_code=404,
-            detail="You are not a member of this server (or your session is stale).",
-        )
-    return gid
+    if any(str(g.get("id")) == gid for g in session.get("guilds", [])):
+        return gid
+    if gid in await user_data_service.guild_ids_with_data(user_id):
+        return gid
+    raise HTTPException(
+        status_code=404,
+        detail=(
+            "You are not a member of this server and have no stored records "
+            "there (or your session is stale)."
+        ),
+    )
 
 
 @router.get("/user/guilds")
@@ -87,7 +98,7 @@ async def data_summary(
     entries before deciding whether to download or erase them.
     """
     user_id = str(session["user_id"])
-    gid = _resolve_guild_scope(session, guild_id)
+    gid = await _resolve_guild_scope(session, guild_id, user_id)
     return await user_data_service.summary(user_id, gid)
 
 
@@ -97,7 +108,7 @@ async def export_data(
     session: dict = Depends(get_current_user),
 ):
     user_id = str(session["user_id"])
-    gid = _resolve_guild_scope(session, guild_id)
+    gid = await _resolve_guild_scope(session, guild_id, user_id)
     payload = await user_data_service.export_all(user_id, gid)
     body = json.dumps(payload, indent=2, default=str).encode("utf-8")
 
@@ -129,7 +140,7 @@ async def delete_data(
             detail="Delete must be confirmed by sending {confirm: true}.",
         )
     user_id = str(session["user_id"])
-    gid = _resolve_guild_scope(session, body.guild_id)
+    gid = await _resolve_guild_scope(session, body.guild_id, user_id)
     deleted = await user_data_service.erase_all(user_id, gid)
     logger.info(
         "Erased user data for %s (guild=%s): %s", user_id, gid or "all", deleted
