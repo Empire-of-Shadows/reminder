@@ -3,6 +3,17 @@
 All notable, community-facing changes to ImperialReminder are recorded here in plain language.
 For the technical, commit-level history, see git.
 
+## [Unreleased] - 2026-08-24 (Imperial Reminder is now 100% free)
+
+### Changed
+- **Every feature is now free for every server.** Custom reminder wording and the shorter
+  waits on OneBump (30 minutes) and Unfocused (90 minutes) no longer need premium - write
+  your message, pick your cooldown, and it is used. There is no premium tier any more: the
+  `/premium` commands are gone, the Premium sections have left the admin panel and the
+  dashboard, and nothing is locked behind a grant.
+- **The privacy policy and terms were updated to match.** The bot no longer keeps premium
+  records of any kind, and the policy no longer mentions them.
+
 ## [Unreleased] - 2026-08-24 (picking a channel checks everything the bot needs)
 
 ### Fixed

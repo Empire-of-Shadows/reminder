@@ -5,7 +5,6 @@ import type {
   Guild,
   GuildBumpStats,
   GuildOverview,
-  MemberEntitlements as Entitlements,
   MemberReminder,
   User,
 } from "../api/types";
@@ -17,7 +16,6 @@ import { Tile } from "../_engine/components/overview/Tile";
 import AppHeader from "../components/AppHeader";
 import PageSkeleton from "../components/PageSkeleton";
 import AdminOverview from "../components/overview/AdminOverview";
-import MemberEntitlements from "../components/overview/MemberEntitlements";
 import MemberOverview from "../components/overview/MemberOverview";
 import { formatCountdown, formatRelative } from "../components/overview/format";
 
@@ -70,10 +68,6 @@ function StatsHero({ stats }: { stats: PublicStats | null }) {
             <div className="empire-stat__value">{formatCount(stats.bots_tracked)}</div>
             <div className="empire-stat__label">Bots Tracked</div>
           </div>
-          <div className="empire-stat">
-            <div className="empire-stat__value">{formatCount(stats.premium_servers)}</div>
-            <div className="empire-stat__label">Premium Servers</div>
-          </div>
         </div>
       )}
     </section>
@@ -84,10 +78,9 @@ function StatsHero({ stats }: { stats: PublicStats | null }) {
 interface MemberPane {
   bumps: GuildBumpStats | null;
   reminder: MemberReminder | null;
-  entitlements: Entitlements | null;
 }
 
-const EMPTY_MEMBER: MemberPane = { bumps: null, reminder: null, entitlements: null };
+const EMPTY_MEMBER: MemberPane = { bumps: null, reminder: null };
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -193,8 +186,7 @@ export default function DashboardPage() {
     const memberRequest = Promise.all([
       swallow(api.memberBumps(selectedGuildId)),
       swallow(api.memberReminder(selectedGuildId)),
-      swallow(api.memberEntitlements(selectedGuildId)),
-    ]).then(([bumps, reminder, entitlements]) => ({ bumps, reminder, entitlements }));
+    ]).then(([bumps, reminder]) => ({ bumps, reminder }));
 
     const overviewRequest: Promise<GuildOverview | null | "error"> = isAdmin
       ? api.guildOverview(selectedGuildId).catch((e) => {
@@ -227,7 +219,7 @@ export default function DashboardPage() {
   if (loading) return <PageSkeleton />;
 
   const anyMemberSection =
-    member.bumps !== null || member.reminder !== null || member.entitlements !== null;
+    member.bumps !== null || member.reminder !== null;
 
   return (
     <div className="app-layout">
@@ -340,21 +332,6 @@ export default function DashboardPage() {
               </>
             )}
 
-            <h2 className="section-title" style={{ margin: "28px 0 12px" }}>
-              What you can use
-            </h2>
-            {member.entitlements ? (
-              <MemberEntitlements entitlements={member.entitlements} />
-            ) : (
-              <QuietGrid>
-                <Tile span={12} quiet title="What you can use">
-                  <p className="ov-body">
-                    What this server unlocks could not be loaded right now. Refresh to try
-                    again.
-                  </p>
-                </Tile>
-              </QuietGrid>
-            )}
 
             {!anyMemberSection && !isAdmin && (
               <p className="ov-muted" style={{ marginTop: 16 }}>
@@ -381,7 +358,6 @@ function signalsFor(
   memberBumps: GuildBumpStats | null,
 ): Signal[] {
   const bumps = overview?.bumps ?? null;
-  const premium = overview?.premium ?? null;
 
   // An admin reads the server's roll-up; a member reads the same timings
   // computed from the rows they are allowed to see. Neither is invented.
@@ -403,9 +379,6 @@ function signalsFor(
         label: bumps.last_bump !== null ? "Last bump" : "Last bump - none seen",
       },
     ];
-    if (premium?.is_premium) {
-      signals.push({ key: "premium", value: premium.tier ?? "Yes", label: "Premium" });
-    }
     return signals;
   }
 

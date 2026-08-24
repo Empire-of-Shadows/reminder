@@ -18,7 +18,6 @@ What this bot actually stores, and therefore what can honestly be reported:
   - ``timestamps.<bot>_reminded`` - the bump timestamp the last delivered
     reminder covered (``BumpHandler._mark_reminded``). Comparing the two is the
     only record of whether a reminder actually went out for the newest bump.
-  - ``premium_state`` - the engine's derived per-scope premium document.
   - ``audit_log`` - who changed which setting, when (TTL 365 days).
 
 Two things are deliberately NOT reported:
@@ -30,8 +29,8 @@ Two things are deliberately NOT reported:
   - Anything per-member. ImperialReminder tracks servers, not people.
 
 Snowflake spelling: the config document keys guilds as a STRING ``_id`` while
-the admin seam writes audit entries with an INT ``guild_id`` and the premium cog
-writes a STRING one. Every audit filter here therefore matches both spellings,
+the admin seam writes audit entries with an INT ``guild_id`` while this dashboard
+(and the retired premium cog's historical rows) write a STRING one. Every audit filter here therefore matches both spellings,
 the same way ``services/user_data.py`` does.
 """
 
@@ -56,7 +55,6 @@ TREND_DAYS = 30
 RECENT_CHANGES_LIMIT = 6
 
 _AUDIT_COLLECTION = "audit_log"
-_PREMIUM_STATE_COLLECTION = "premium_state"
 
 
 # -- Small shared helpers ---------------------------------------------------
@@ -102,7 +100,7 @@ def fill_daily(counts: dict[str, int], days: int = TREND_DAYS) -> list[dict]:
 # -- Bump activity ----------------------------------------------------------
 
 
-def build_bumps(config: GuildConfig, premium: bool) -> dict:
+def build_bumps(config: GuildConfig) -> dict:
     """``BumpsOverview`` - live per-bot bump state for this guild.
 
     The per-bot rows come straight from ``services/stats.guild_bump_stats`` so
@@ -112,7 +110,7 @@ def build_bumps(config: GuildConfig, premium: bool) -> dict:
     the one thing that distinguishes "the bot noticed the bump" from "the bot
     actually pinged somebody".
     """
-    stats = stats_service.guild_bump_stats(config, premium=premium)
+    stats = stats_service.guild_bump_stats(config)
     now = int(stats["server_time"])
 
     ready = 0
@@ -191,41 +189,6 @@ def build_setup(config: GuildConfig) -> dict:
     }
 
 
-# -- Premium ----------------------------------------------------------------
-
-
-async def build_premium(guild_id: int, config: GuildConfig, premium: bool) -> dict:
-    """``PremiumOverview`` - entitlement state plus what it unlocks here.
-
-    ``custom_message_active`` is the point of this section. The reminder sender
-    only substitutes ``custom_message`` for a premium guild
-    (``BumpHandler._delayed_send``), so a server that wrote one without premium
-    is quietly still sending the default text. Saying so is the difference
-    between a setting that looks applied and one that is.
-    """
-    doc = None
-    try:
-        doc = await db_manager.get_collection_manager(
-            _PREMIUM_STATE_COLLECTION
-        ).find_one({"_id": f"guild:{guild_id}"})
-    except Exception:
-        logger.warning("premium_state lookup failed for guild %s", guild_id, exc_info=True)
-
-    doc = doc or {}
-    tier = doc.get("tier")
-    webhook = (config.premium or {}).get("guild_webhook")
-    has_message = bool((config.custom_message or "").strip())
-
-    return {
-        "is_premium": bool(premium),
-        # The stored tier is only meaningful while the entitlement is live.
-        "tier": str(tier) if (premium and tier) else None,
-        "expires_at": _iso(doc.get("expires_at")),
-        "webhook_configured": bool(webhook),
-        "custom_message_active": bool(premium and has_message),
-    }
-
-
 # -- Change history ---------------------------------------------------------
 
 
@@ -237,7 +200,7 @@ def _entry_actor(doc: dict) -> str | None:
     """Best available name for whoever made the change.
 
     The admin seam stores the display name inside ``details.actor_name``; the
-    premium cog stores no name at all. A redacted entry keeps "[redacted]",
+    retired premium cog stored no name at all (historical rows). A redacted entry keeps "[redacted]",
     which is a truthful answer and must survive to the page unchanged.
     """
     details = doc.get("details")
@@ -254,8 +217,8 @@ def _entry_row(doc: dict) -> dict:
 
     Three writers, three shapes: the admin panel nests section/key inside
     ``details``, this dashboard writes them at the top level (the engine's
-    canonical ``log_config_change`` shape), and the premium cog writes a
-    ``category``. All three are read here so a server's recent-changes list
+    canonical ``log_config_change`` shape), and the retired premium cog wrote a
+    ``category`` (historical rows). All three are read here so a server's recent-changes list
     shows web edits and panel edits as the same kind of thing.
     """
     details = doc.get("details") if isinstance(doc.get("details"), dict) else {}
@@ -323,7 +286,6 @@ def build_features(
     *,
     bumps: dict | None,
     setup: dict | None,
-    premium: dict | None,
     changes: dict | None,
 ) -> list[dict]:
     """One ``FeatureStatus`` per feature, in the order the home page shows them.
@@ -381,13 +343,10 @@ def build_features(
     # -- Custom message ------------------------------------------------------
     has_message = bool((setup or {}).get("custom_message_set")) if setup is not None \
         else bool((config.custom_message or "").strip())
-    is_premium = bool((premium or {}).get("is_premium"))
-    if not has_message:
-        state, detail = "off", "Sending the standard reminder"
-    elif not is_premium:
-        state, detail = "needs_setup", "Premium only - the standard reminder is being sent"
-    else:
+    if has_message:
         state, detail = "on", "Sending your own wording"
+    else:
+        state, detail = "off", "Sending the standard reminder"
     features.append({"key": "custom_message", "label": "Custom message", "state": state,
                      "detail": detail, "settings_key": "message"})
 

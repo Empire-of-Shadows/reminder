@@ -11,7 +11,7 @@ import AppHeader from "../components/AppHeader";
  * numbered `legal-doc` body - and it renders without a session, loading the
  * signed-in user only to personalise the header.
  */
-const EFFECTIVE_DATE = "August 13, 2026";
+const EFFECTIVE_DATE = "August 24, 2026";
 
 export default function TermsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -110,13 +110,12 @@ export default function TermsPage() {
         </section>
 
         <section className="section card">
-          <h2 className="section-title" style={{ marginTop: 0 }}>5. Premium features</h2>
+          <h2 className="section-title" style={{ marginTop: 0 }}>5. Everything is free</h2>
           <p>
-            Some features - a custom reminder wording, and a shorter wait on the listing services
-            that offer one - are available to servers with premium. Premium is currently granted
-            manually by the operators; there is no paid subscription, no purchase, and nothing to
-            cancel. A grant may be given, changed, or withdrawn at any time, and premium features
-            simply stop applying when it lapses. The rest of the bot keeps working.
+            Every feature of Imperial Reminder - including custom reminder wording and the
+            shorter waits on the listing services that offer one - is available to every
+            server at no cost. There is no premium tier, no paid subscription, no purchase,
+            and nothing to cancel.
           </p>
         </section>
 

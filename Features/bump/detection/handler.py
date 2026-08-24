@@ -4,7 +4,6 @@ import re
 import time
 from collections import defaultdict
 
-import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -362,23 +361,15 @@ class BumpHandler(commands.Cog):
 
         if reminders:
             config = await self.bot.guild_config_manager.get_config(channel.guild.id)
-            # Premium comes from the engine entitlement state; the webhook URL is
-            # still guild config (a premium-gated delivery setting).
-            premium_enabled = False
-            pm = getattr(self.bot, "premium_manager", None)
-            if pm is not None:
-                try:
-                    premium_enabled = await pm.is_premium_guild(str(channel.guild.id))
-                except Exception as e:
-                    logger.warning(f"Premium check failed for {channel.guild.id}: {e}")
-            webhook_url = config.premium.get("guild_webhook")
 
             bots = ", ".join(f"**{bot_name}**" for _, bot_name in reminders)
             role_mentions = set(role_id for role_id, _ in reminders if role_id)
             role_mentions_text = " ".join(f"<@&{r}>" for r in role_mentions)
 
+            # A written custom message is always used - every feature of this
+            # bot is free for every server (gates removed 2026-08-24).
             custom_message = config.custom_message
-            if custom_message and premium_enabled:
+            if custom_message:
                 message = custom_message.replace("{bump_role}", role_mentions_text).replace("{bots}", bots)
             else:
                 message = f"{role_mentions_text} It's time to bump again for: {bots}!"
@@ -392,19 +383,8 @@ class BumpHandler(commands.Cog):
             )
 
             try:
-                if premium_enabled and webhook_url:
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            webhook = discord.Webhook.from_url(webhook_url, session=session)
-                            await webhook.send(content=message, allowed_mentions=mentions)
-                        logger.info(
-                            f"Sent batched bump reminder via webhook for {channel.guild.id} in {channel.id}: {bots}")
-                    except Exception as webhook_error:
-                        logger.error(f"Failed to send via webhook for guild {channel.guild.id}: {webhook_error}")
-                        await channel.send(message, allowed_mentions=mentions)
-                else:
-                    await channel.send(message, allowed_mentions=mentions)
-                    logger.info(f"Sent batched bump reminder for {channel.guild.id} in {channel.id}: {bots}")
+                await channel.send(message, allowed_mentions=mentions)
+                logger.info(f"Sent batched bump reminder for {channel.guild.id} in {channel.id}: {bots}")
                 await self._mark_reminded(
                     channel.guild.id, [b for _, b in reminders], config.timestamps
                 )

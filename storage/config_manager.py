@@ -27,12 +27,6 @@ def _normalize_roles(raw: Any) -> Dict[str, Any]:
     return {"admin_role_ids": list(raw.get("admin_role_ids") or [])}
 
 
-def _default_premium() -> Dict[str, Any]:
-    return {
-        "enabled": False,
-        "activated_by": 0,
-        "guild_webhook": 0,
-    }
 
 def _default_bot_delay() -> Dict[str, Any]:
     return {
@@ -62,7 +56,6 @@ DEFAULT_GUILD_CONFIG_DICT = {
     "timers_message": True,
     "custom_message": "",
     "roles": _default_roles(),
-    "premium": _default_premium(),
     "bot_delay": _default_bot_delay(),
     "timestamps": _default_timestamps(),
 }
@@ -80,7 +73,6 @@ class GuildConfig:
     # Canonical panel-role config (roles.admin_role_ids), consumed by the
     # dashboard and the admin panel to gate access.
     roles: Dict[str, Any] = field(default_factory=_default_roles)
-    premium: Dict[str, Any] = field(default_factory=_default_premium)
     bot_delay: Dict[str, Any] = field(default_factory=_default_bot_delay)
     timestamps: Dict[str, Any] = field(default_factory=_default_timestamps)
     # Dynamic fields like timer_message_{channel_id} are handled in to_dict/from_dict
@@ -99,7 +91,6 @@ class GuildConfig:
             "timers_message": self.timers_message,
             "custom_message": self.custom_message,
             "roles": self.roles,
-            "premium": self.premium,
             "bot_delay": self.bot_delay,
             "timestamps": self.timestamps,
             "created_at": self.created_at,
@@ -117,6 +108,9 @@ class GuildConfig:
         # Identify extra data (keys not in standard fields)
         standard_keys = {
             "guild_id", "_id", "enabled_bots", "bump_channel", "bump_role",
+            # "premium" stays listed although the field is gone (2026-08-24, the
+            # bot went 100% free): stored docs still carry the key until migration
+            # m2 unsets it, and listing it here keeps it out of extra_data.
             "timers_channel", "timers_message", "custom_message", "roles", "premium",
             "bot_delay", "timestamps", "created_at", "updated_at"
         }
@@ -131,7 +125,6 @@ class GuildConfig:
             timers_message=data.get("timers_message", True),
             custom_message=data.get("custom_message", ""),
             roles=_normalize_roles(data.get("roles")),
-            premium=data.get("premium", _default_premium()),
             bot_delay=data.get("bot_delay", _default_bot_delay()),
             timestamps=data.get("timestamps", _default_timestamps()),
             extra_data=extra_data,
@@ -226,7 +219,7 @@ class GuildConfigManager:
         """Set several (dotted) keys for a guild in one surgical $set.
 
         Preferred over save_config for partial edits: it never rewrites the
-        whole document, so concurrent writers (bot timestamps, premium sweeper,
+        whole document, so concurrent writers (bot timestamps,
         dashboard) cannot clobber each other's fields.
         """
         if not updates:

@@ -3,7 +3,8 @@
 Mirrors TheHost's ``/api/user/*`` surface so the two dashboards behave the same
 under one SSO session. What differs is the payload: ImperialReminder has no
 per-member tracking to export or opt out of, so the only account-linked records
-are admin audit entries and premium grants (see ``services/user_data.py``).
+are admin audit entries (see ``services/user_data.py``; premium was removed
+2026-08-24, so no entitlement records exist any more).
 """
 
 import json

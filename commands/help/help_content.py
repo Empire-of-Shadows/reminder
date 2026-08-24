@@ -86,7 +86,7 @@ REMINDERS = HelpCategory(
         "**The reminder**\n"
         "\N{BULLET} Only the bump role is ever pinged - never everyone, never you directly\n"
         "\N{BULLET} If two listing bots come due together, you get one message covering both\n"
-        "\N{BULLET} On premium servers the wording can be customized by an admin\n"
+        "\N{BULLET} An admin can replace the wording with the server's own message\n"
         "\n"
         "**The status message**\n"
         "A few seconds after a bump, the bot posts a status message in the bump channel "
@@ -96,38 +96,6 @@ REMINDERS = HelpCategory(
         "**If the bot restarts**\n"
         "Countdowns are rebuilt from the last bump, so nothing is lost. A reminder that "
         "came due while the bot was offline still arrives, and only once."
-    ),
-)
-
-PREMIUM = HelpCategory(
-    key="premium",
-    label="Premium",
-    description="Check this server's premium status and what it unlocks",
-    emoji="\N{GEM STONE}",
-    accent=discord.Color.gold().value,
-    thumbnail=None,
-    # Admin-only by owner ruling 2026-08-19: premium is a server-owner concern, so
-    # every bot documents it on an admin surface. This is a DISPLAY gate on the help
-    # page only - `/premium status` itself carries no permission check on any bot and
-    # any member can still run it. Relay reaches the same place by keeping its premium
-    # block inside its Admin category rather than having a category of its own.
-    admin_only=True,
-    blurb="Optional extras for a server, not for individual members.",
-    body=(
-        "**`/premium status`**\n"
-        "Shows whether this server has premium, which tier, and when it expires. The "
-        "answer is only visible to you.\n"
-        "\n"
-        "**What premium adds**\n"
-        "\N{BULLET} Custom wording on the reminder message instead of the standard one\n"
-        "\N{BULLET} Reminders delivered through a server webhook\n"
-        "\N{BULLET} Shorter waits on the listing bots that support them - OneBump can drop "
-        "to 30 minutes and Unfocused to 90 minutes\n"
-        "\n"
-        "Premium applies to a whole server, so it changes nothing about your own account. "
-        "It is granted by Empire of Shadows staff.\n"
-        "\n"
-        f"The bot's privacy policy is at {PRIVACY_URL}"
     ),
 )
 
@@ -147,16 +115,15 @@ ADMIN = HelpCategory(
         "\N{BULLET} **Panel Access Roles** - which roles may open this panel and use the "
         "dashboard\n"
         "\N{BULLET} **Bump Bots** - which listing bots to watch, and the wait for each\n"
-        "\N{BULLET} **Messages** - custom reminder wording (premium) and the status "
+        "\N{BULLET} **Messages** - custom reminder wording and the status "
         "message on/off\n"
-        "\N{BULLET} **Premium** - the server's live premium state\n"
         "\n"
         "**First-time setup**\n"
         "Set a **Bump Channel** and a **Bump Role** under Core Setup. Nothing runs until "
         "both are set, and the other sections stay locked. If somebody bumps before that "
         "is done, the bot posts a one-time notice explaining what is missing.\n"
         "\n"
-        "The bot needs Send Messages and Embed Links in the bump channel.\n"
+        "The bot needs View Channel, Send Messages, Embed Links and Read Message History in the bump channel.\n"
         "\n"
         "**Who can open the panel**\n"
         "Anyone with Manage Server, plus any role added under Panel Access Roles. Those "
@@ -170,7 +137,7 @@ ADMIN = HelpCategory(
 
 
 CATEGORIES: dict[str, HelpCategory] = {
-    c.key: c for c in (OVERVIEW, REMINDERS, PREMIUM, ADMIN)
+    c.key: c for c in (OVERVIEW, REMINDERS, ADMIN)
 }
 CATEGORY_ORDER: list[str] = list(CATEGORIES)
 DEFAULT_CATEGORY = OVERVIEW.key

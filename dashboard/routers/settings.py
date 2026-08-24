@@ -11,7 +11,6 @@ from storage.config_manager import get_guild_config_manager, GuildConfig
 from storage.sub_systems.bump_config import (
     BUMP_BOTS,
     BUMP_BOTS_CHOICES,
-    BUMP_BOTS_PREMIUM,
     SUPPORTED_BOTS,
 )
 from storage.log import get_logger
@@ -96,7 +95,7 @@ def _normalized_roles(raw) -> dict:
     return {"admin_role_ids": [str(r) for r in (raw.get("admin_role_ids") or [])]}
 
 
-def _coerce_bot_delay(value, premium: bool) -> dict[str, int]:
+def _coerce_bot_delay(value) -> dict[str, int]:
     """Validate an incoming ``bot_delay`` map into ``{bot: seconds}``.
 
     Two separate checks, and both matter. The key must be a bot this bot
@@ -104,9 +103,7 @@ def _coerce_bot_delay(value, premium: bool) -> dict[str, int]:
     THAT bot (``BUMP_BOTS_CHOICES``) - a free-typed number here would let the
     dashboard schedule a reminder shorter than the listing service's real
     cooldown, so every reminder after it would be for a bump that cannot be
-    made. Premium-only choices are rejected outright for a non-premium guild
-    rather than silently downgraded, because a silent downgrade looks like a
-    saved setting that is not being honoured.
+    made.
     """
     value = value if isinstance(value, dict) else {}
     out: dict[str, int] = {}
@@ -127,14 +124,6 @@ def _coerce_bot_delay(value, premium: bool) -> dict[str, int]:
             raise HTTPException(
                 status_code=422,
                 detail=f"bot_delay.{bot} is not one of the cooldowns offered for that bot",
-            )
-        if not premium and seconds == BUMP_BOTS_PREMIUM.get(bot):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"The shorter {bot} cooldown is a premium feature and this "
-                    "server does not have premium."
-                ),
             )
         out[bot] = seconds
     return out
@@ -191,8 +180,7 @@ async def update_settings(
     before = await gcm.get_config(guild_id)
 
     # Build a whitelisted partial update and write it as one surgical $set.
-    # Never replace the whole document: the bot process writes timestamps and
-    # premium flags concurrently, and a full-document write from a cached
+    # Never replace the whole document: the bot process writes timestamps concurrently, and a full-document write from a cached
     # snapshot would silently clobber them.
     updates: dict = {}
     for key, value in patch.items():
@@ -212,8 +200,7 @@ async def update_settings(
         elif key == "bot_delay":
             # Per-bot cooldowns are written as dotted leaves so saving one bot's
             # cooldown never rewrites another's.
-            premium = await stats_service.guild_is_premium(guild_id)
-            for bot, seconds in _coerce_bot_delay(value, premium).items():
+            for bot, seconds in _coerce_bot_delay(value).items():
                 updates[f"bot_delay.{bot}"] = seconds
 
     if updates:

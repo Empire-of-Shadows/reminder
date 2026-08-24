@@ -23,7 +23,6 @@ from storage.sub_systems.bump_config import (
     BOT_DISPLAY_NAMES,
     BUMP_BOTS,
     BUMP_BOTS_CHOICES,
-    BUMP_BOTS_PREMIUM,
     SUPPORTED_BOTS,
 )
 from storage.log import get_logger
@@ -180,9 +179,8 @@ async def bump_bots():
 
     ``choices`` is the same table the in-Discord panel offers, so the dashboard
     cannot present a cooldown the panel would not - and cannot invent one the
-    listing service does not honour. Most services have exactly one choice; the
-    ones with two are where premium buys a shorter wait, flagged so the form can
-    say why an option is unavailable instead of just hiding it.
+    listing service does not honour. Most services have exactly one choice; a
+    couple offer a shorter wait as a second option.
     """
     return [
         {
@@ -193,7 +191,6 @@ async def bump_bots():
                 {
                     "label": label,
                     "seconds": int(seconds),
-                    "premium": int(seconds) == BUMP_BOTS_PREMIUM.get(key),
                 }
                 for label, seconds in BUMP_BOTS_CHOICES.get(key, {}).items()
             ],
@@ -246,5 +243,4 @@ async def guild_bump_stats(guild_id: int, _session: dict = Depends(require_panel
     """Per-bot bump status for a guild (last bump, cooldown, next due, status)."""
     gcm = await get_guild_config_manager(db_manager)
     config = await gcm.get_config(guild_id)
-    premium = await stats_service.guild_is_premium(guild_id)
-    return stats_service.guild_bump_stats(config, premium=premium)
+    return stats_service.guild_bump_stats(config)

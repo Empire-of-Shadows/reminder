@@ -100,10 +100,6 @@ export default function LoginPage() {
                   </span>
                 </>
               )}
-              <span className="stat-sep">·</span>
-              <span>
-                <span className="stat-num">{formatCount(stats.premium_servers)}</span>premium
-              </span>
             </div>
 
             {stats.per_bot && stats.per_bot.some((bot) => bot.servers > 0) && (

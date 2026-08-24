@@ -102,7 +102,6 @@ export default function ContextColumn(props: ContextProps) {
 
 function ContextBody({ slug, draft, channels, roles, bots, overview }: ContextProps) {
   const bumps = overview?.bumps ?? null;
-  const premium = overview?.premium ?? null;
   const changes = overview?.changes ?? null;
 
   if (slug === "bumps") {
@@ -173,11 +172,7 @@ function ContextBody({ slug, draft, channels, roles, bots, overview }: ContextPr
       <KvCard
         title="Waiting time"
         rows={rows}
-        footer={
-          premium && !premium.is_premium
-            ? "The shorter waits are a premium feature. Picking one on a server without premium is refused rather than quietly ignored."
-            : "This is how long the bot waits before saying a service is ready. It does not change the listing service's own cooldown."
-        }
+        footer={"This is how long the bot waits before saying a service is ready. It does not change the listing service's own cooldown."}
       />
     );
   }
@@ -205,22 +200,12 @@ function ContextBody({ slug, draft, channels, roles, bots, overview }: ContextPr
       ["Message written", text ? "Yes" : "No"],
       ["Length", `${(draft.custom_message ?? "").length} characters`],
     ];
-    if (premium) {
-      rows.push(["Premium", premium.is_premium ? "Active" : "Not active"]);
-      rows.push([
-        "Being sent",
-        premium.custom_message_active ? "Your wording" : "The standard reminder",
-      ]);
-    }
+    rows.push(["Being sent", text ? "Your wording" : "The standard reminder"]);
     return (
       <KvCard
         title="Right now"
         rows={rows}
-        footer={
-          premium && !premium.is_premium && text
-            ? "Saved, but the standard reminder is what goes out until this server has premium."
-            : "Use {bump_role} where the ping should go and {bots} for the list of bump bots."
-        }
+        footer={"Use {bump_role} where the ping should go and {bots} for the list of bump bots."}
       />
     );
   }

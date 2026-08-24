@@ -11,7 +11,7 @@ import AppHeader from "../components/AppHeader";
  * over a numbered `legal-doc` body. Renders without a session - it tries to
  * load the signed-in user only to personalise the header, and ignores failures.
  */
-const EFFECTIVE_DATE = "August 13, 2026";
+const EFFECTIVE_DATE = "August 24, 2026";
 
 export default function PrivacyPolicyPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -62,10 +62,6 @@ export default function PrivacyPolicyPage() {
                 your custom reminder message, and which roles may manage these settings.
               </li>
               <li>
-                <strong>Premium records</strong>: entitlement status for premium features - who
-                granted it, who or which server it applies to, and when it expires.
-              </li>
-              <li>
                 <strong>A record of settings changes</strong>: when someone changes a server's
                 setup from the in-Discord panel or the dashboard, we record who changed it, what
                 changed, and when, so a server's managers can see their own history. These
@@ -86,7 +82,7 @@ export default function PrivacyPolicyPage() {
           <section className="section card">
             <h2 className="section-title" style={{ marginTop: 0 }}>3. How we use your data</h2>
             <p>
-              We use this data to run bump reminders, apply premium features, and gate the
+              We use this data to run bump reminders and gate the
               dashboard's settings to people who can manage a server. We do not sell your data and
               we do not show advertising.
             </p>
@@ -115,8 +111,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="section-title" style={{ marginTop: 0 }}>6. Data retention</h2>
             <p>
               We keep a server's bump configuration until a manager changes it or the bot is
-              removed from the server, after which related configuration may be cleaned up. Premium
-              records are kept for the life of the entitlement. Settings-change records are removed
+              removed from the server, after which related configuration may be cleaned up. Settings-change records are removed
               automatically one year after they were written. Login sessions expire automatically.
             </p>
           </section>
@@ -133,8 +128,7 @@ export default function PrivacyPolicyPage() {
               Erasure works by <strong>redaction, not deletion</strong>. A settings-change entry
               is the server's own record that something changed, and its managers rely on that
               history, so erasing removes your name and Discord ID from the entry while the
-              entry itself stays. Premium grants are also kept: they are grant records rather
-              than personal data, and removing one would remove somebody's premium.
+              entry itself stays.
             </p>
             <p>
               Server managers can view and change all stored configuration any time from the{" "}

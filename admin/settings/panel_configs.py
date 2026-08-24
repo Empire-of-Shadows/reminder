@@ -12,8 +12,9 @@ Accessor contract (per PanelNode):
 
 Top-level shape follows ADMIN_PANEL_STANDARD.md 1.1 (menu when an entry groups two
 or more settings, leaf when it is a single setting): Core Setup and Panel Access
-Roles form the "main" cluster, with Bump Bots / Messages / Premium below the
-"Feature Configurations" divider.
+Roles form the "main" cluster, with Bump Bots / Messages below the
+"Feature Configurations" divider. There is no Premium section: the bot is
+100% free (premium removed 2026-08-24).
 
 The panel is admin-only: ``bindings.resolve_panel_role`` never returns "mod", so no
 the engine's ``mod_allowed`` node flag was removed fleet-wide on 2026-08-06.
@@ -24,12 +25,10 @@ import discord
 from .panel_branding import PANEL_DESCRIPTION, PANEL_TITLE
 from ..views.panel_engine import PanelNode
 from ..actions.features import panel_roles_pair
-from ..actions.structure.info import info_action
 from storage.config_manager import get_guild_config_manager
 from storage.sub_systems.bump_config import (
     BUMP_BOTS,
     BUMP_BOTS_CHOICES,
-    BUMP_BOTS_PREMIUM,
     SUPPORTED_BOTS,
 )
 
@@ -142,32 +141,6 @@ async def _set_timers_message(guild_id: int, values: list) -> bool:
     return await cm.set_value(guild_id, "timers_message", enabled)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Premium status (engine entitlement state; staff-issued codes are retired)
-# ─────────────────────────────────────────────────────────────────────────────
-
-async def _render_premium_status(cog, guild, ctx) -> str:
-    """Live premium status from the engine PremiumManager's derived state."""
-    pm = getattr(cog.bot, "premium_manager", None)
-    if pm is None:
-        return "Premium status is unavailable right now - try again shortly."
-    state = await pm.get_guild_state(str(guild.id))
-    if state.is_premium:
-        expires = (
-            f"<t:{int(state.expires_at.timestamp())}:R>" if state.expires_at else "Never"
-        )
-        return (
-            "**Status:** ✅ Premium active\n"
-            f"**Tier:** {state.tier}\n"
-            f"**Expires:** {expires}"
-        )
-    return (
-        "**Status:** ❌ Not active\n\n"
-        "Premium unlocks custom reminder messages, webhook delivery, and shorter "
-        "reminder cooldowns on supported bump bots.\n"
-        "Check `/premium status` anytime; premium is granted by Empire of Shadows "
-        "staff."
-    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -280,15 +253,12 @@ def _build_cooldown_children() -> dict:
     for bot_name in SUPPORTED_BOTS:
         choices = BUMP_BOTS_CHOICES.get(bot_name, {f"{BUMP_BOTS[bot_name] // 60} Minutes": BUMP_BOTS[bot_name]})
         options = [(str(secs), label) for label, secs in choices.items()]
-        prem = BUMP_BOTS_PREMIUM.get(bot_name)
-        premium_values = {str(prem)} if prem is not None else None
         children[f"cd_{bot_name}"] = PanelNode(
             key=f"cd_{bot_name}",
             label=_bot_label(bot_name),
             kind="option_select",
             description=f"Reminder cooldown for {_bot_label(bot_name)}.",
             options=options,
-            premium_values=premium_values,
             get_values=lambda gid, b=bot_name: _get_delay(gid, b),
             set_values=lambda gid, vals, b=bot_name: _set_delay(gid, vals, b),
             min_values=1,
@@ -319,7 +289,7 @@ BOTS_CONFIG = PanelNode(
             key="cooldowns",
             label="Cooldowns",
             kind="menu",
-            description="Per-bot reminder cooldowns. 💎 options require Premium.",
+            description="Per-bot reminder cooldowns.",
             children=_build_cooldown_children(),
         ),
     },
@@ -372,28 +342,6 @@ MESSAGES_CONFIG = PanelNode(
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Premium
-# ─────────────────────────────────────────────────────────────────────────────
-
-PREMIUM_CONFIG = PanelNode(
-    key="premium",
-    label="Premium",
-    kind="menu",
-    category_group="feature",
-    description=(
-        "Premium features for this server. See **Premium Status** or "
-        "`/premium status` for the live state."
-    ),
-    children={
-        "status": info_action(
-            "premium_status",
-            label="Premium Status",
-            render=_render_premium_status,
-            description="Current premium state for this server.",
-        ),
-    },
-)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -439,6 +387,5 @@ MAIN_PANEL = PanelNode(
         # ── Feature Configurations ────────────────────────────────────
         "bots": BOTS_CONFIG,
         "messages": MESSAGES_CONFIG,
-        "premium": PREMIUM_CONFIG,
     },
 )

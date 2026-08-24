@@ -17,8 +17,6 @@ be able to take the bump timings down with it.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends
 
 from dashboard.auth.dependencies import require_guild_member
@@ -26,27 +24,10 @@ from dashboard.services import stats as stats_service
 from storage.config_manager import get_guild_config_manager
 from storage.settings.collections import db_manager
 from storage.log import get_logger
-from storage.sub_systems.bump_config import (
-    BOT_DISPLAY_NAMES,
-    BUMP_BOTS,
-    BUMP_BOTS_PREMIUM,
-)
 
 logger = get_logger("dashboard.routers.member")
 
 router = APIRouter(tags=["member"])
-
-_PREMIUM_STATE_COLLECTION = "premium_state"
-
-
-def _iso(value) -> str | None:
-    """Datetime -> ISO-8601. Naive values are read as UTC (how every writer here
-    stores them). Anything else becomes None."""
-    if not isinstance(value, datetime):
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.isoformat()
 
 
 @router.get("/guilds/{guild_id}/member/bumps")
@@ -60,12 +41,7 @@ async def member_bumps(guild_id: int, _session: dict = Depends(require_guild_mem
     """
     gcm = await get_guild_config_manager(db_manager)
     config = await gcm.get_config(guild_id)
-    try:
-        premium = await stats_service.guild_is_premium(guild_id)
-    except Exception:
-        logger.warning("premium lookup failed for guild %s", guild_id, exc_info=True)
-        premium = False
-    return stats_service.guild_bump_stats(config, premium=premium)
+    return stats_service.guild_bump_stats(config)
 
 
 @router.get("/guilds/{guild_id}/member/reminder")
@@ -140,75 +116,4 @@ async def member_reminder(guild_id: int, session: dict = Depends(require_guild_m
         "bots_tracked": tracked,
         "you_will_be_pinged": pinged,
         "status": "yes" if pinged else "no",
-    }
-
-
-@router.get("/guilds/{guild_id}/member/entitlements")
-async def member_entitlements(guild_id: int, _session: dict = Depends(require_guild_member)):
-    """What this server's members can actually use here.
-
-    Premium on ImperialReminder is a *server* entitlement, not a personal one -
-    it unlocks the same two things for everybody in the server. So this reports
-    the server's state and what it does or does not unlock, plus the commands a
-    member can run. The custom reminder's wording is not included: whether one
-    is in use is a member's business, its text is the manager's.
-    """
-    gcm = await get_guild_config_manager(db_manager)
-    config = await gcm.get_config(guild_id)
-
-    try:
-        premium = await stats_service.guild_is_premium(guild_id)
-    except Exception:
-        logger.warning("premium lookup failed for guild %s", guild_id, exc_info=True)
-        premium = False
-
-    doc = None
-    try:
-        doc = await db_manager.get_collection_manager(
-            _PREMIUM_STATE_COLLECTION
-        ).find_one({"_id": f"guild:{guild_id}"})
-    except Exception:
-        logger.warning("premium_state lookup failed for guild %s", guild_id, exc_info=True)
-    doc = doc or {}
-    tier = doc.get("tier")
-
-    written = bool((config.custom_message or "").strip())
-    enabled = [str(b) for b in (config.enabled_bots or []) if str(b) in BUMP_BOTS]
-    delays = config.bot_delay or {}
-
-    faster = []
-    for key in enabled:
-        premium_cooldown = BUMP_BOTS_PREMIUM.get(key)
-        if premium_cooldown is None:
-            continue
-        standard = int(BUMP_BOTS[key])
-        current = int(delays.get(key, standard) or standard)
-        faster.append({
-            "key": key,
-            "name": BOT_DISPLAY_NAMES.get(key, key.title()),
-            "standard_cooldown": standard,
-            "premium_cooldown": int(premium_cooldown),
-            "active": bool(premium and current == int(premium_cooldown)),
-        })
-
-    return {
-        "is_premium": bool(premium),
-        "tier": str(tier) if (premium and tier) else None,
-        "expires_at": _iso(doc.get("expires_at")),
-        "custom_wording": {
-            "available": bool(premium),
-            "written": written,
-            "in_use": bool(premium and written),
-        },
-        "faster_cooldowns": faster,
-        "commands": [
-            {
-                "name": "/help",
-                "detail": "Browse what the bot does and how the reminders work.",
-            },
-            {
-                "name": "/premium status",
-                "detail": "Check whether this server has premium and when it runs out.",
-            },
-        ],
     }

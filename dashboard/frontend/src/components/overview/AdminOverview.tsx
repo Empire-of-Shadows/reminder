@@ -3,7 +3,6 @@ import type {
   BumpsOverview,
   ChangesOverview,
   GuildOverview,
-  PremiumOverview,
   SetupOverview,
 } from "../../api/types";
 import BarChart, { type BarChartSeries } from "../../_engine/components/charts/BarChart";
@@ -27,7 +26,6 @@ export default function AdminOverview({ overview }: { overview: GuildOverview })
       <IsItWorking overview={overview} />
       <BumpTimers guildId={guildId} bumps={overview.bumps} setup={overview.setup} />
       <SetupHealth guildId={guildId} setup={overview.setup} />
-      <Premium guildId={guildId} premium={overview.premium} setup={overview.setup} />
       <ChangeActivity guildId={guildId} changes={overview.changes} />
     </div>
   );
@@ -206,67 +204,6 @@ function SetupHealth({ guildId, setup }: { guildId: string; setup: SetupOverview
   );
 }
 
-/* ── Premium ───────────────────────────────────────────────────────── */
-
-function Premium({
-  guildId,
-  premium,
-  setup,
-}: {
-  guildId: string;
-  premium: PremiumOverview | null;
-  setup: SetupOverview | null;
-}) {
-  if (!premium) {
-    return (
-      <Tile span={3} title="Premium">
-        <SectionUnavailable what="Premium status" />
-      </Tile>
-    );
-  }
-
-  const wroteMessage = !!setup?.custom_message_set;
-
-  return (
-    <Tile
-      span={3}
-      title="Premium"
-      chips={
-        premium.is_premium ? (
-          <span className="ov-chip ov-chip--good">Active</span>
-        ) : (
-          <span className="ov-chip">Free</span>
-        )
-      }
-    >
-      <Stat value={premium.is_premium ? premium.tier ?? "Premium" : "Free"} label="This server" />
-      <div>
-        <KeyValue
-          k="Custom message"
-          v={premium.custom_message_active ? "In use" : wroteMessage ? "Written" : "Not written"}
-        />
-        {/* Nothing in the bot or the dashboard writes premium.guild_webhook, so
-            an unset value means "never offered", not "you have not set it up
-            yet". Showing "Not set" would invite an admin to go looking for a
-            switch that does not exist, so the row only appears when a value is
-            actually stored. */}
-        {premium.webhook_configured && <KeyValue k="Webhook delivery" v="Set up" />}
-        {premium.expires_at && (
-          <KeyValue k="Runs out" v={formatIsoRelative(premium.expires_at)} />
-        )}
-      </div>
-      {wroteMessage && !premium.is_premium && (
-        <p className="ov-muted">
-          Your custom reminder is saved but not being sent - the standard reminder goes out until
-          this server has premium.{" "}
-          <Link className="ov-link" to={`/settings/${guildId}?s=message`}>
-            See the message
-          </Link>
-        </p>
-      )}
-    </Tile>
-  );
-}
 
 /* ── Change activity ───────────────────────────────────────────────── */
 

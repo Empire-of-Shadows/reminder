@@ -10,14 +10,15 @@ shapes:
 * this dashboard (``routers/settings``) writes the engine's canonical
   ``log_config_change`` shape - ``actor_id``/``section``/``key``/``old_value``/
   ``new_value`` at the top level, with ``source: "dashboard"``;
-* the premium cog writes ``category: "premium"`` with a ``payload``.
+* the retired premium cog (removed 2026-08-24) wrote ``category: "premium"``
+  with a ``payload`` - its historical rows still render.
 
 ``_row`` folds all three into one table row rather than showing an admin three
 different-looking histories of their own server. An entry whose shape is not
 recognised still renders - the raw action is more use than a dropped row.
 
-Both guild-id spellings are matched (the panel writes int, the premium cog and
-this dashboard write str), the same way ``services/overview.py`` does.
+Both guild-id spellings are matched (the panel writes int, this dashboard and the
+retired premium cog's historical rows write str), the same way ``services/overview.py`` does.
 """
 
 from __future__ import annotations

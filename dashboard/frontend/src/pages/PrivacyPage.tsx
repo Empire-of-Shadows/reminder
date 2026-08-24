@@ -212,10 +212,6 @@ export default function PrivacyPage() {
                     k="Settings changes recorded against you"
                     v={countLabel(summary?.audit_log_entries)}
                   />
-                  <KeyValue
-                    k="Premium grants involving your account"
-                    v={countLabel(summary?.premium_entitlements)}
-                  />
                 </div>
                 {summaryFailed && (
                   <p className="ov-muted">
@@ -308,13 +304,7 @@ export default function PrivacyPage() {
                     Every settings change recorded against you - what changed, what it was, what
                     it became, and when
                   </li>
-                  <li>Premium grants you made or received</li>
-                  <li>Your premium status record, if one has ever been worked out</li>
                 </ul>
-                <p className="ov-muted">
-                  Your premium status record is account-wide, so it is included whole even when
-                  you have picked a single server above.
-                </p>
                 <div className="admin-actions">
                   <a
                     href={api.exportUserDataUrl(scopeGuildId)}
@@ -340,10 +330,6 @@ export default function PrivacyPage() {
                     The change records themselves. They are the server's history of what was
                     changed and when, which its managers rely on, so they are redacted rather
                     than deleted - the entry survives, it just no longer points at you.
-                  </li>
-                  <li>
-                    Premium grants. They are grant records rather than personal data, and
-                    removing one would remove somebody's premium.
                   </li>
                   <li>
                     Changes you make from this dashboard after erasing, which are recorded the
@@ -487,8 +473,8 @@ function EraseConfirm({
         </h2>
         <p id="privacy-erase-message" className="confirm-message">
           This removes your name and Discord ID from every settings change recorded against you
-          in {scopeLabel}. The change records stay so the server keeps its history, and premium
-          grants stay because they are not personal data. This cannot be undone.
+          in {scopeLabel}. The change records stay so the server keeps its history. This
+          cannot be undone.
         </p>
 
         <div className="eos-field">

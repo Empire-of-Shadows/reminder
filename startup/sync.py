@@ -77,19 +77,6 @@ async def attach_databases():
         except Exception as gate_error:
             failed_logs.append(f"{s}❌ setup_gatekeeper → Error: {gate_error}\n")
 
-        # Engine PremiumManager - entitlement-backed premium over
-        # ImperialReminder.entitlements / .premium_state. The premium cog
-        # (commands/premium/) feeds it events and sets tier_priority; the bump
-        # handler and admin seam read the same derived state.
-        from storage.premium import PremiumManager as EnginePremiumManager
-        try:
-            premium_manager = EnginePremiumManager(db_manager, db_name="ImperialReminder")
-            await premium_manager.initialize()
-            result, is_success = await attach_attribute(bot, "premium_manager", premium_manager)
-            (success_logs if is_success else failed_logs).append(result)
-        except Exception as premium_error:
-            failed_logs.append(f"{s}❌ premium_manager → Error: {premium_error}\n")
-
         # Timer handler - SINGLETON: exactly one instance, created here. Never
         # instantiate another (duplication breaks cancellation and remaining-time math).
         from Features.time_handler import TimerHandler

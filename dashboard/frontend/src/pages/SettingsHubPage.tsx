@@ -263,7 +263,6 @@ function BlobFacts({
 
   const bumps = overview.bumps;
   const changes = overview.changes;
-  const premium = overview.premium;
 
   return (
     <div style={{ margin: "4px 0 12px" }}>
@@ -299,7 +298,6 @@ function BlobFacts({
         k="Changes recorded"
         v={changes ? changes.total : "Not known"}
       />
-      {premium?.is_premium && <KeyValue k="Premium" v={premium.tier ?? "Active"} />}
     </div>
   );
 }

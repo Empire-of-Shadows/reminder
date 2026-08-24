@@ -22,13 +22,14 @@ Tracks successful server bumps across every major listing platform and sends tim
 
 Detects and tracks successful bumps across all major Discord server listing services:
 
-| Platform | Default Cooldown | Premium Cooldown |
+| Platform | Default Cooldown | Shorter Option |
 |---|---|---|
 | **Disboard** | 2 hours | - |
 | **BumpIt** | 1 hour | - |
 | **Bump4You** | 2 hours | - |
 | **WeBump** | 2 hours | - |
 | **OneBump** | 2 hours | 30 minutes |
+| **Unfocused** | 2 hours | 90 minutes |
 
 ### 🔔 Smart Reminders
 - Recognizes successful bump messages instantly across all supported platforms
@@ -57,13 +58,12 @@ The bot uses a **four-layer detection system** to catch bump success messages re
 - Per-bot cooldown overrides
 - Toggle individual bump platforms on or off
 
-### 💎 Premium Features
-- Webhook delivery for branded reminder messages
-- OneBump cooldown reduced to 30 minutes
-- Premium activation via the admin panel
+### 🆓 100% Free
+Every feature - custom reminder wording and the shorter cooldown options included - is
+available to every server at no cost. There is no premium tier.
 
 ### ⚙️ Admin Panel
-> `/admin panel` - unified guild configuration (Discord Components v2). Sections: **Core Setup** (bump channel, bump role, timers channel), **Bump Bots** (which platforms to track and their cooldowns), **Messages** (custom reminder text and live timer toggle), **Premium** (activation and webhook config).
+> `/admin panel` - unified guild configuration (Discord Components v2). Sections: **Core Setup** (bump channel, bump role, timers channel), **Bump Bots** (which platforms to track and their cooldowns), **Messages** (custom reminder text and live timer toggle), and **Panel Access Roles**.
 
 ---
 

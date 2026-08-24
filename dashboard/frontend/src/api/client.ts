@@ -10,7 +10,6 @@ import type {
   GuildSettings,
   GuildBumpStats,
   GuildOverview,
-  MemberEntitlements,
   MemberReminder,
   ScopeGuild,
   DeleteUserDataResponse,
@@ -64,8 +63,6 @@ export const api = {
     apiFetch<GuildBumpStats>(`/api/guilds/${guildId}/member/bumps`),
   memberReminder: (guildId: string) =>
     apiFetch<MemberReminder>(`/api/guilds/${guildId}/member/reminder`),
-  memberEntitlements: (guildId: string) =>
-    apiFetch<MemberEntitlements>(`/api/guilds/${guildId}/member/entitlements`),
 
   // Change history, newest first. `before` is the previous page's next_cursor.
   auditLog: (guildId: string, before?: string | null, limit = 50) =>
@@ -111,7 +108,6 @@ export interface PublicBotCount {
 export interface PublicStats {
   servers: number;
   bots_tracked: number;
-  premium_servers: number;
   /** Servers with a bump channel, a role to ping AND at least one bot chosen.
    *  Optional so a cached older payload from before this field still renders. */
   servers_ready?: number;

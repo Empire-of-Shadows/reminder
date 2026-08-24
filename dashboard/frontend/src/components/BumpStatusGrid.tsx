@@ -102,7 +102,6 @@ export default function BumpStatusGrid({ stats, createdAt }: BumpStatusGridProps
             ) : (
               <span className="ov-chip ov-chip--warn">Setup incomplete</span>
             )}
-            {stats.premium && <span className="ov-chip">Premium</span>}
           </div>
           <div className="ov-stat-l">This server</div>
         </div>

@@ -20,11 +20,6 @@ DEFAULT_GUILD_CONFIG = OrderedDict([
     ("timers_channel", 0),
     ("timers_message", True),
     ("custom_message", ""),
-    ("premium", OrderedDict([
-        ("enabled", False),
-        ("activated_by", 0),
-        ("guild_webhook", 0),
-    ])),
     ("bot_delay", OrderedDict([
         ("bumpit", ONE),
         ("bump4you", TWO),
@@ -99,11 +94,6 @@ BOT_DISPLAY_NAMES = {
     "unfocused": "Unfocused",
 }
 
-# Premium bot delays
-BUMP_BOTS_PREMIUM = {
-    "onebump": THREE_0,
-    "unfocused": H1_30,
-}
 
 # Choices for slash command UI
 BUMP_BOTS_CHOICES = {
@@ -111,6 +101,6 @@ BUMP_BOTS_CHOICES = {
     "bump4you": {"2 Hours": TWO},
     "disboard": {"2 Hours": TWO},
     "webump": {"2 Hours": TWO},
-    "onebump": {"2 Hours": TWO, "30 Minutes (Premium)": THREE_0},
-    "unfocused": {"2 Hours": TWO, "90 Minutes (Premium)": H1_30},
+    "onebump": {"2 Hours": TWO, "30 Minutes": THREE_0},
+    "unfocused": {"2 Hours": TWO, "90 Minutes": H1_30},
 }

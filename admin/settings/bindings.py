@@ -6,7 +6,7 @@ ImperialReminder's backends through the names defined here. See
 
 Every persistence path flows through the bot's existing managers (which themselves write via
 the shared ``db_manager``'s collection managers): per-guild config through
-``GuildConfigManager`` (canonical ``roles`` / ``premium`` shape + an ``extra_data`` catch-all),
+``GuildConfigManager`` (canonical ``roles`` shape + an ``extra_data`` catch-all),
 audit entries through ``storage/audit_log.py``. Nothing here opens its own collection handle.
 
 ImperialReminder's ``panel_configs.py`` binds its leaves to inline ``GuildConfigManager``
@@ -54,7 +54,7 @@ ROLE_ACCESS_PATH = "Panel Access Roles"
 def _dig(config: Any, path: str, default: Any = None) -> Any:
     """Read a dotted ``path`` off a GuildConfig: first segment is a dataclass attribute
     (falling back to ``extra_data`` for dynamic keys like ``hide_setup_guide``); deeper
-    segments index dicts (``roles.admin_role_ids``, ``premium.enabled``)."""
+    segments index dicts (``roles.admin_role_ids``)."""
     parts = path.split(".")
     node = getattr(config, parts[0], None)
     if node is None and hasattr(config, "extra_data"):
@@ -103,17 +103,11 @@ async def set_setting(key: str, value: Any, guild_id: int) -> None:
 # ── Premium ──────────────────────────────────────────────────────────────────────
 
 async def is_premium(guild_id: int) -> bool:
-    """Engine entitlement state (bot.premium_manager); the legacy premium.enabled
-    config flag is retired and no longer written."""
-    from startup.bot import bot
-    pm = getattr(bot, "premium_manager", None)
-    if pm is None:
-        return False
-    try:
-        return await pm.is_premium_guild(str(guild_id))
-    except Exception as e:
-        logger.warning(f"is_premium check failed for {guild_id}: {e}")
-        return False
+    """ImperialReminder is 100% free (premium removed 2026-08-24): every feature is
+    available to every server. The vendored engine imports this symbol by name
+    (``admin_cog`` gates ``premium_values`` options through it), so it must exist -
+    and it answers True so nothing is ever locked."""
+    return True
 
 
 # ── Cache invalidation ───────────────────────────────────────────────────────────

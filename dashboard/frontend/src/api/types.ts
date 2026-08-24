@@ -30,8 +30,6 @@ export interface Guild extends EngineGuild {
 export interface BumpBotChoice {
   label: string;
   seconds: number;
-  /** Only selectable while the server has premium. */
-  premium: boolean;
 }
 
 export interface BumpBot {
@@ -113,12 +111,10 @@ export interface UserDataSummary {
   user_id: string;
   guild_id: string | null;
   audit_log_entries: number | null;
-  premium_entitlements: number | null;
 }
 
 export interface GuildBumpStats {
   guild_id: string;
-  premium: boolean;
   config_complete: boolean;
   enabled_count: number;
   /** Server's current unix time - anchor client countdowns to avoid clock skew. */
@@ -162,16 +158,6 @@ export interface SetupOverview {
   created_at: string | null;
 }
 
-export interface PremiumOverview {
-  is_premium: boolean;
-  tier: string | null;
-  expires_at: string | null;
-  webhook_configured: boolean;
-  /** True only when premium is live AND a custom message is written: the sender
-   *  falls back to the standard text otherwise. */
-  custom_message_active: boolean;
-}
-
 /** One day of the change trend. `date` is YYYY-MM-DD in UTC. */
 export interface ChangePoint {
   date: string;
@@ -201,7 +187,6 @@ export interface GuildOverview {
   features: FeatureStatus[];
   bumps: BumpsOverview | null;
   setup: SetupOverview | null;
-  premium: PremiumOverview | null;
   changes: ChangesOverview | null;
 }
 
@@ -221,36 +206,6 @@ export interface MemberReminder {
    *  as "no". */
   you_will_be_pinged: boolean | null;
   status: "yes" | "no" | "no_role" | "unknown";
-}
-
-/** A bump bot whose cooldown premium can shorten in this server. */
-export interface FasterCooldown {
-  key: string;
-  name: string;
-  standard_cooldown: number;
-  premium_cooldown: number;
-  /** True only when premium is live AND this server picked the shorter time. */
-  active: boolean;
-}
-
-export interface MemberCommand {
-  name: string;
-  detail: string;
-}
-
-/** What a member of this server can actually use. Premium here is a property of
- *  the SERVER, not of the person reading the page. */
-export interface MemberEntitlements {
-  is_premium: boolean;
-  tier: string | null;
-  expires_at: string | null;
-  custom_wording: {
-    available: boolean;
-    written: boolean;
-    in_use: boolean;
-  };
-  faster_cooldowns: FasterCooldown[];
-  commands: MemberCommand[];
 }
 
 // ── Audit log (GET /api/guilds/{id}/audit-log) ────────────────────────────

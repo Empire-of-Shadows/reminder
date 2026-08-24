@@ -5,18 +5,18 @@ message log, or activity record anywhere in its collections. Only two kinds of
 document can be tied to a person:
 
 * ``audit_log`` entries naming them as the actor of a settings change (written
-  as ``user_id`` by the admin panel seam, as ``actor_id`` by the premium cog).
-* ``entitlements`` records they granted (``granted_by``) or that were granted
-  to them directly (``scope="user"``).
+  as ``user_id`` by the admin panel seam; the retired premium cog wrote
+  ``actor_id``, and its historical rows are still matched).
 
-Export dumps both. Erasure redacts the actor identity from audit entries rather
+Export dumps them. Erasure redacts the actor identity from audit entries rather
 than dropping them: the entry is the *server's* record that a setting changed,
 and letting an admin wipe their own trail from a public web UI would gut the
-audit log. Entitlements are grant records and are left intact, mirroring
-TheHost, which keeps premium on delete.
+audit log. (Premium was removed 2026-08-24; entitlement records no longer
+exist, migration m2 cleans the stored collections.)
 
-Both id fields are written inconsistently across the codebase (int from the
-admin seam, str from the premium cog), so every filter matches both forms.
+Both id fields were written inconsistently across the codebase (int from the
+admin seam, str from the retired premium cog), so every filter matches both
+forms.
 """
 
 from __future__ import annotations
@@ -30,8 +30,6 @@ from storage.log import get_logger
 logger = get_logger("dashboard.services.user_data")
 
 AUDIT_COLLECTION = "audit_log"
-ENTITLEMENTS_COLLECTION = "entitlements"
-PREMIUM_STATE_COLLECTION = "premium_state"
 
 REDACTED_NAME = "[redacted]"
 
@@ -61,29 +59,8 @@ def _audit_filter(user_id: str, guild_id: str | None) -> dict:
     return {"$and": [_actor_filter(user_id), _guild_clause(guild_id)]}
 
 
-def _entitlement_filter(user_id: str, guild_id: str | None) -> dict:
-    forms = _both_forms(user_id)
-    mine = {
-        "$or": [
-            {"granted_by": {"$in": forms}},
-            {"scope": "user", "scope_id": {"$in": forms}},
-        ]
-    }
-    if guild_id is None:
-        return mine
-    return {"$and": [mine, {"scope": "guild", "scope_id": str(guild_id)}]}
-
-
 def _audit():
     return db_manager.get_collection_manager(AUDIT_COLLECTION)
-
-
-def _entitlements():
-    return db_manager.get_collection_manager(ENTITLEMENTS_COLLECTION)
-
-
-def _premium_state():
-    return db_manager.get_collection_manager(PREMIUM_STATE_COLLECTION)
 
 
 def _serializable(doc: dict) -> dict:
@@ -103,14 +80,6 @@ async def guild_ids_with_data(user_id: str) -> set[str]:
         ids |= {str(r["_id"]) for r in rows if r.get("_id") is not None}
     except Exception:
         logger.warning("audit guild scan failed for user %s", user_id, exc_info=True)
-    try:
-        rows = await _entitlements().aggregate([
-            {"$match": {**_entitlement_filter(user_id, None), "scope": "guild"}},
-            {"$group": {"_id": "$scope_id"}},
-        ])
-        ids |= {str(r["_id"]) for r in rows if r.get("_id") is not None}
-    except Exception:
-        logger.warning("entitlement guild scan failed for user %s", user_id, exc_info=True)
     return ids
 
 
@@ -120,27 +89,6 @@ async def fetch_audit_entries(user_id: str, guild_id: str | None) -> list[dict]:
         sort=[("created_at", -1)],
     )
     return [_serializable(d) for d in docs]
-
-
-async def fetch_entitlements(user_id: str, guild_id: str | None) -> list[dict]:
-    docs = await _entitlements().find_many(_entitlement_filter(user_id, guild_id))
-    return [_serializable(d) for d in docs]
-
-
-async def fetch_premium_state(user_id: str) -> dict | None:
-    """The engine's derived ``user:<id>`` premium doc, if one was ever computed.
-
-    Read-only and account-wide: it is derived from the entitlements above rather
-    than written independently, so it is never scoped by server and is never
-    erased (erasing it would only make the derived state disagree with the
-    records it comes from until the next recompute).
-    """
-    try:
-        doc = await _premium_state().find_one({"_id": f"user:{user_id}"})
-    except Exception:
-        logger.warning("premium_state lookup failed for user %s", user_id, exc_info=True)
-        return None
-    return _serializable(doc) if doc else None
 
 
 async def export_all(user_id: str, guild_id: str | None = None) -> dict:
@@ -155,10 +103,6 @@ async def export_all(user_id: str, guild_id: str | None = None) -> dict:
             "records tied to your Discord account."
         ),
         "audit_log_entries": await fetch_audit_entries(user_id, guild_id),
-        "premium_entitlements": await fetch_entitlements(user_id, guild_id),
-        # Account-wide by definition; included whole even when a server scope is
-        # selected, and labelled as such so the file is not misread.
-        "premium_state": await fetch_premium_state(user_id),
     }
 
 
@@ -171,19 +115,11 @@ async def summary(user_id: str, guild_id: str | None = None) -> dict:
     to render as "could not be counted" rather than as a confident zero.
     """
     audit_count: int | None
-    entitlement_count: int | None
     try:
         audit_count = int(await _audit().count_documents(_audit_filter(user_id, guild_id)))
     except Exception:
         logger.warning("audit count failed for user %s", user_id, exc_info=True)
         audit_count = None
-    try:
-        entitlement_count = int(
-            await _entitlements().count_documents(_entitlement_filter(user_id, guild_id))
-        )
-    except Exception:
-        logger.warning("entitlement count failed for user %s", user_id, exc_info=True)
-        entitlement_count = None
 
     # Deliberately no "already redacted" count. Redaction nulls the very id
     # fields these filters match on, so an already-redacted entry is invisible
@@ -193,7 +129,6 @@ async def summary(user_id: str, guild_id: str | None = None) -> dict:
         "user_id": str(user_id),
         "guild_id": str(guild_id) if guild_id is not None else None,
         "audit_log_entries": audit_count,
-        "premium_entitlements": entitlement_count,
     }
 
 

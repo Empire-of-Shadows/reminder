@@ -100,7 +100,7 @@ const RAIL_GROUPS: { name: string; items: RailItem[] }[] = [
         label: "Cooldowns",
         title: "How long between bumps",
         blurb:
-          "How long the bot waits before telling you a service can be bumped again. Most services have one fixed cooldown and nothing to choose; a couple allow a shorter wait on a premium server.",
+          "How long the bot waits before telling you a service can be bumped again. Most services have one fixed cooldown and nothing to choose; a couple offer a shorter wait.",
         saveLabel: "Save cooldowns",
         search: [
           "Cooldown",
@@ -109,7 +109,6 @@ const RAIL_GROUPS: { name: string; items: RailItem[] }[] = [
           "Wait",
           "30 minutes",
           "90 minutes",
-          "Premium",
         ],
       },
       {
@@ -126,9 +125,9 @@ const RAIL_GROUPS: { name: string; items: RailItem[] }[] = [
         label: "Reminder wording",
         title: "Custom reminder message",
         blurb:
-          "Replace the standard reminder with your own wording. This is a premium feature - the standard reminder is used until this server has premium.",
+          "Replace the standard reminder with your own wording. Once saved, it is what the bot sends.",
         saveLabel: "Save wording",
-        search: ["Custom message", "Wording", "bump_role", "bots", "Premium"],
+        search: ["Custom message", "Wording", "bump_role", "bots"],
       },
     ],
   },
@@ -336,11 +335,6 @@ export default function SettingsPage() {
   }, [guildId]);
 
   const enabled = useMemo(() => new Set(settings?.enabled_bots ?? []), [settings]);
-
-  // Premium decides whether the shorter cooldowns can be picked. The overview
-  // is optional, so when it did not load this stays null - unknown, not false -
-  // and the options are left selectable for the server to answer on save.
-  const isPremium = overview?.premium?.is_premium ?? null;
 
   function update<K extends keyof GuildSettings>(key: K, value: GuildSettings[K]) {
     setSettings((s) => (s ? { ...s, [key]: value } : s));
@@ -588,19 +582,6 @@ export default function SettingsPage() {
                             );
                           })}
                         </FRow>
-                        {/* Said once under the row rather than repeated in every
-                            field's help text, which read as a wall of the same
-                            sentence when more than one service offers it. */}
-                        {isPremium === false &&
-                          adjustable.some((bot) =>
-                            (bot.choices ?? []).some((c) => c.premium),
-                          ) && (
-                            <p className="eos-muted">
-                              The options marked Premium need this server to have premium.
-                              Picking one without it is refused on save rather than quietly
-                              ignored, so a cooldown shown here is always the one being used.
-                            </p>
-                          )}
                       </>
                     )}
                     {fixed.length > 0 && (

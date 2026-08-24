@@ -66,13 +66,12 @@ Thin seam over the vendored `startup/loader.py`: `COG_DIRECTORIES = ["./commands
 | `bot.audit_log` | `storage.audit_log` | engine AuditLog over the TTL'd `audit_log` collection |
 | `bot.guild_config_manager` | `storage.config_manager` | typed wrapper over engine GuildConfigStore |
 | `bot.setup_gatekeeper` | `storage.setup_gatekeeper` | engine SetupGate (bump channel + role required) |
-| `bot.premium_manager` | `storage.premium` (engine) | entitlement-backed premium |
 | `bot.timer_handler` | `Features.time_handler.TimerHandler` | reminder scheduling (SINGLETON) |
 | `bot.idle_manager` | `Features.idle.IdleManager` | presence rotation (engine PresenceRotator seam) |
 
 ### Storage Layer (`storage/`)
 
-- **Seam** `storage/settings/collections.py`: the collection registry (`settings_guild_data` = live guild config + bump timestamps in DB `ImperialReminder`; engine premium `entitlements` / `premium_state` / `bot_settings`; TTL'd `audit_log`) passed as `collection_configs=` to the engine base, plus the relay-style `get_collection`/`db_client` accessors the engine premium subsystem binds through. `db_manager` is imported as `from storage.settings.collections import db_manager`.
+- **Seam** `storage/settings/collections.py`: the collection registry (`settings_guild_data` = live guild config + bump timestamps in DB `ImperialReminder`; TTL'd `audit_log`) passed as `collection_configs=` to the engine base. `db_manager` is imported as `from storage.settings.collections import db_manager`. (The engine premium collections and the raw `get_collection`/`db_client` accessors were removed 2026-08-24 with premium itself; migration m2 cleans the stored collections.)
 - **`config_manager.py`**: `GuildConfig` dataclass (typed domain access) + `GuildConfigManager`, a thin wrapper over the engine `GuildConfigStore` (`id_field="_id"`, 30s cache TTL bounding cross-process staleness vs the dashboard). Every write is a surgical dotted `$set` - never a full-document replace. `peek()` gives sync display-only access; `invalidate()` drops a guild's cache.
   ```python
   config = await bot.guild_config_manager.get_config(guild_id)
@@ -80,8 +79,8 @@ Thin seam over the vendored `startup/loader.py`: `COG_DIRECTORIES = ["./commands
       return
   await bot.guild_config_manager.set_value(guild_id, "timestamps.disboard_timestamp", int(time.time()))
   ```
-  `GuildConfig` fields: `enabled_bots`, `bump_channel`, `bump_role`, `timers_channel`, `timers_message`, `custom_message`, `roles` (panel access lists), `premium` (only `guild_webhook` is still meaningful - the `enabled` flag is retired), `bot_delay`, `timestamps`, `extra_data` (dynamic keys like `timer_message_{channel_id}`).
-- **`sub_systems/bump_config.py`**: bump-bot constants (`BUMP_BOTS_INFO`, `BUMP_BOTS`, `BUMP_BOTS_PREMIUM`, `SUCCESS_KEYWORDS`, ...).
+  `GuildConfig` fields: `enabled_bots`, `bump_channel`, `bump_role`, `timers_channel`, `timers_message`, `custom_message`, `roles` (panel access lists), `bot_delay`, `timestamps`, `extra_data` (dynamic keys like `timer_message_{channel_id}`). (The `premium` dict was removed 2026-08-24; the key stays listed in `from_dict`'s standard set so stored docs are ignored, not adopted into `extra_data`, until migration m2 unsets them.)
+- **`sub_systems/bump_config.py`**: bump-bot constants (`BUMP_BOTS_INFO`, `BUMP_BOTS`, `SUCCESS_KEYWORDS`, ...).
 - Logging: `from storage.log import get_logger, setup_application_logging` (loguru engine subsystem). The old `storage/logging/` and `utils/logger.py` are gone.
 
 ### TimerHandler (`Features/time_handler.py`)
@@ -90,15 +89,15 @@ Production-grade scheduler for all reminders. **One instance** created in `attac
 
 ### BumpHandler (`Features/bump/detection/handler.py`)
 
-Detects bump-success messages via **two listeners**: `on_message` and `on_message_edit` (WeBump edits ~1s after an empty message - handled by force-refetch on edit). `extract_all_text` aggregates embeds/content/components/attachments/stickers with a refetch fallback and normalization. `_resolve_bot_info` matches `author_id`/`webhook_id` against `BUMP_BOTS_INFO` (forgery-resistant: keywords alone never trigger). Success flow: save timestamp (dotted `$set`) -> compute timers -> schedule embed update -> schedule reminder. Reminders batch in a 10s window per channel (`channel_tasks`, cancelled in `cog_unload` AND at shutdown); premium guilds get `custom_message` + optional webhook delivery; sends use an explicit `AllowedMentions` that allows ONLY the bump role.
+Detects bump-success messages via **two listeners**: `on_message` and `on_message_edit` (WeBump edits ~1s after an empty message - handled by force-refetch on edit). `extract_all_text` aggregates embeds/content/components/attachments/stickers with a refetch fallback and normalization. `_resolve_bot_info` matches `author_id`/`webhook_id` against `BUMP_BOTS_INFO` (forgery-resistant: keywords alone never trigger). Success flow: save timestamp (dotted `$set`) -> compute timers -> schedule embed update -> schedule reminder. Reminders batch in a 10s window per channel (`channel_tasks`, cancelled in `cog_unload` AND at shutdown); a written `custom_message` replaces the standard wording (every feature is free - premium was removed 2026-08-24, and the old premium-only webhook delivery path went with it since nothing could ever configure it); sends use an explicit `AllowedMentions` that allows ONLY the bump role.
 
-### Premium (`commands/premium/` + engine `storage/premium/`)
+### Premium: removed (2026-08-24)
 
-Entitlement-backed premium on the shared engine (`PremiumManager`: `entitlements` fold into a derived `premium_state` per scope). The portable cog package (origin: Stygian-Relay) runs in **manual-grant-only mode** (no Discord SKUs yet): owners grant via `/premium-admin grant`, users check `/premium status`. Seam: `commands/premium/settings/config.py` (env-driven `PREMIUM_OWNER_IDS`, `PREMIUM_ADMIN_GUILD_IDS`, optional `PREMIUM_APPLICATION_ID` to enable reconcile). Reads go through `bot.premium_manager.is_premium_guild()` (bump handler, admin seam) or the derived `premium_state` doc (dashboard). The old staff-code system (`codes` / `entitlements_cache` collections, `Features/premium/`) is retired.
+ImperialReminder is 100% free. The `commands/premium/` package, the engine `PremiumManager` attach, the panel Premium section, the dashboard premium surfaces, and the `PREMIUM_*` env vars are all gone; `bindings.is_premium` remains only because the vendored engine imports it by name, and it returns True. The vendored `storage/premium/` engine files remain (byte-identical fleet-wide) but nothing constructs them. Stored premium data (`entitlements`, `premium_state`, `bot_settings`, the config `premium` dict) is cleaned by migration m2.
 
 ### Admin Panel (`admin/`)
 
-Vendored admin_engine at the bot root; seam in `admin/settings/`. `MAIN_PANEL` tree: Core Setup (bump channel/role, timers channel) and Panel Access Roles (a top-level LEAF per ADMIN_PANEL_STANDARD 1.1 - engine `panel_roles_pair(include_mod=False, str_ids=True)` writing `roles.admin_role_ids`, the same list the dashboard reads, gated by the builder's default `manage_guild_pre_check`) in the `main` group, then Bump Bots (enabled bots, per-bot cooldowns with premium tiers), Messages (custom message, timer embed), Premium (live status via `info_action`) in the `feature` group.
+Vendored admin_engine at the bot root; seam in `admin/settings/`. `MAIN_PANEL` tree: Core Setup (bump channel/role, timers channel) and Panel Access Roles (a top-level LEAF per ADMIN_PANEL_STANDARD 1.1 - engine `panel_roles_pair(include_mod=False, str_ids=True)` writing `roles.admin_role_ids`, the same list the dashboard reads, gated by the builder's default `manage_guild_pre_check`) in the `main` group, then Bump Bots (enabled bots, per-bot cooldowns), Messages (custom message, timer embed) in the `feature` group.
 
 The panel is **ADMIN-ONLY**: `bindings.resolve_panel_role` delegates to the engine `resolve_panel_role_from_config` (Manage Server OR `roles.admin_role_ids`) and collapses anything else to "none". There is no Mod tier, no `roles.mod_role_ids` key, and no `PanelNode.mod_allowed` flags in the seam. (The vendored engine still carries mod machinery for the bots that have not converted - leave it alone.)
 
@@ -110,13 +109,13 @@ FastAPI backend + React 19/TS/Vite SPA, on the shared dashboard_engine (`_engine
 - `auth/panel_role.py` is a thin 2-tier policy (admin/none) over `_engine/auth/panel_access.py`: MANAGE_GUILD verified LIVE on access-gated routes; guild-list probes use `verify_manage_live=False`. There is no Mod tier - `roles.admin_role_ids` is the only configured grant, and every dashboard route is admin-only.
 - Settings PUT: whitelisted surgical dotted `$set` only (never a full-document write - the bot writes timestamps concurrently) and validates channel/role ids belong to the guild.
 - Discord API reads (bot guilds, bot id, channels, roles) go through the engine `_engine/discord_cache.py` (TTL + single-flight + bounded).
-- `routers/user_data.py` + `services/user_data.py` back the `/me/privacy` page, mirroring TheHost's `/api/user/*` surface (`/user/guilds?with_data=`, `/user/data/export`, `DELETE /user/data`). ImperialReminder has no per-member tracking, so the only account-linked records are `audit_log` entries naming the actor and `entitlements` the user granted or received. Erasure REDACTS the actor identity on audit entries (never drops them - a self-service wipe of the trail would gut the audit log); entitlements are left intact. Both id fields are written as int (admin seam) and str (premium cog), so every filter matches both spellings.
+- `routers/user_data.py` + `services/user_data.py` back the `/me/privacy` page, mirroring TheHost's `/api/user/*` surface (`/user/guilds?with_data=`, `/user/data/export`, `DELETE /user/data`). ImperialReminder has no per-member tracking, so the only account-linked records are `audit_log` entries naming the actor. Erasure REDACTS the actor identity on audit entries (never drops them - a self-service wipe of the trail would gut the audit log). Both id spellings are matched (int from the admin seam, str from the retired premium cog's historical rows).
 
 ## Supported Bump Bots
 
 Configured in `storage/sub_systems/bump_config.py`:
 
-| Bot | ID | Default Cooldown | Premium Cooldown |
+| Bot | ID | Default Cooldown | Shorter Option (free) |
 |-----|-----|------------------|------------------|
 | Disboard | 302050872383242240 | 2 hours | - |
 | BumpIt | 1006190394415005788 | 1 hour | - |
@@ -145,11 +144,10 @@ Configured in `storage/sub_systems/bump_config.py`:
 
 Bot: `DISCORD_TOKEN` (or `TOKEN`), `MONGO_URI`.
 Dashboard: `GATEKEEPER_CLIENT_ID/SECRET`, `GATEKEEPER_REDIRECT_URI`, `DASHBOARD_SECRET_KEY`, `SHARED_SESSIONS_URI`, `DASHBOARD_HOST`, `DASHBOARD_PORT`, `ENVIRONMENT`, `BASE_URL`, optional `TRUSTED_PROXY_IPS`, `COOKIE_DOMAIN` (prod: `.eosofficial.club`).
-Premium: `PREMIUM_OWNER_IDS`, `PREMIUM_ADMIN_GUILD_IDS`, optional `PREMIUM_APPLICATION_ID` (+ `PREMIUM_LOG_CHANNEL_ID`, `PREMIUM_NOTIFY_OWNERS`, `PREMIUM_TEST_MODE`).
 
 ## Testing Locally
 
-1. `python Reminder.py`; confirm DB init, managers attached (incl. `premium_manager`, `idle_manager`), cogs loaded (incl. `admin.admin_cog`, `commands.premium.cog`), commands synced, health on 50014.
+1. `python Reminder.py`; confirm DB init, managers attached (incl. `idle_manager`), cogs loaded (incl. `admin.admin_cog`), commands synced, health on 50014.
 2. `curl http://localhost:50014/health` -> `status: healthy` (stop Mongo -> HTTP 503 `unhealthy`).
 3. `/admin panel` -> Core Setup -> set bump channel + role; trigger a real bump; verify `Timer started: {guild_id}:{channel_id}:bump:{bot_name}`.
 4. `python -m dashboard.app`; `curl http://localhost:54014/health`.

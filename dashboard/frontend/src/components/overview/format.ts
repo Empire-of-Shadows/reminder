@@ -43,7 +43,8 @@ function humanize(value: string): string {
  *
  * Entries arrive in two shapes: the admin panel writes
  * `action: "set:core.bump_channel"` with `details.section`/`details.key`, while
- * the premium cog writes `action: "grant"` with a category. Both are handled,
+ * the retired premium cog wrote `action: "grant"` with a category
+ * (historical rows still render). Both are handled,
  * and anything unrecognised falls back to the raw action rather than being
  * dropped - an unexplained entry still tells an admin that something changed.
  */

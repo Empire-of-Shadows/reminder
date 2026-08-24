@@ -38,33 +38,8 @@ COLLECTIONS: dict[str, CollectionConfig] = {
         name="GuildData",
         database=REMINDER_DB,
         connection="primary",
-        indexes=[
-            IndexModel([("premium.enabled", 1)], name="premium_enabled_idx"),
-        ],
-    ),
-    # Entitlement-backed premium (engine ``storage.premium.PremiumManager``): raw
-    # ``entitlements`` records fold into the derived ``premium_state`` doc per scope,
-    # and reconcile health lives on ``bot_settings``. Indexes are owned by
-    # ``PremiumManager._ensure_indexes`` (raw client), so none are declared here;
-    # registering keeps the engine aware of the collections. The legacy
-    # ``codes`` / ``entitlements_cache`` collections are retired (drop them
-    # manually - premium data is rebuildable via manual grants).
-    "entitlements": CollectionConfig(
-        name="entitlements",
-        database=REMINDER_DB,
-        connection="primary",
-        indexes=[],
-    ),
-    "premium_state": CollectionConfig(
-        name="premium_state",
-        database=REMINDER_DB,
-        connection="primary",
-        indexes=[],
-    ),
-    "premium_bot_settings": CollectionConfig(
-        name="bot_settings",
-        database=REMINDER_DB,
-        connection="primary",
+        # No declared indexes: the old premium_enabled_idx is dropped by
+        # migration m2 (premium removed 2026-08-24, the bot is 100% free).
         indexes=[],
     ),
     # Admin-panel audit trail (written by the engine AuditLog service via
@@ -85,18 +60,10 @@ COLLECTIONS: dict[str, CollectionConfig] = {
 
 
 class DatabaseManager(DatabaseManagerBase):
-    """ImperialReminder's MongoDB manager: engine core + the motor-era raw accessors the
-    engine ``storage.premium.PremiumManager`` binds through (relay-blessed back-compat
-    seam; needed by the premium consolidation phase)."""
+    """ImperialReminder's MongoDB manager (engine core; no bot-specific extensions since
+    the premium subsystem was removed 2026-08-24 - the raw get_collection/db_client
+    accessors existed only for the engine PremiumManager to bind through)."""
 
-    def get_collection(self, database_name: str, collection_name: str):
-        """Back-compat alias for the engine's ``get_raw_collection`` (motor-era API)."""
-        return self.get_raw_collection(database_name, collection_name)
-
-    @property
-    def db_client(self):
-        """Back-compat: the primary pymongo client (the engine owns the connection pool)."""
-        return self.get_client()
 
 
 # -- The shared manager (constructed from bindings + the registry above) ---------
