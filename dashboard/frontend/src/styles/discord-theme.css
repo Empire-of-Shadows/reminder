@@ -513,8 +513,6 @@ a:focus-visible {
 }
 .bump-chip--ok { background: rgba(61, 220, 151, 0.12); color: var(--success); border-color: rgba(61, 220, 151, 0.35); }
 .bump-chip--warn { background: rgba(255, 184, 107, 0.12); color: var(--warning); border-color: rgba(255, 184, 107, 0.35); }
-.bump-chip--premium { background: rgba(169, 125, 255, 0.15); color: var(--text-accent); border-color: rgba(169, 125, 255, 0.4); }
-
 .bump-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
