@@ -230,6 +230,12 @@ class PanelNode:
     list_action: Optional[Callable] = None             # async (guild_id, value) -> bool; act on chosen item
     list_action_confirm_line: Optional[Callable] = None  # sync (item) -> str; confirm-step text
     list_count: Optional[Callable] = None              # async (guild_id) -> int; efficient summary count
+    list_extra_action_label: Optional[str] = None      # e.g. "Add Rule"; None => no extra button
+    # async (cog, interaction, guild, ctx: ActionContext) -> None - the same contract
+    # as an action node's ``on_run``. Rendered as a button in the list view; the
+    # handler receives ``ctx.parent_node`` = the LIST node itself, so a flow's
+    # back-to-panel navigation lands back on the list it was launched from.
+    list_extra_action: Optional[Callable] = None
 
     # grouped_paginated_select only - a single-value leaf chosen via a two-step
     # picker: pick a group, then pick an item within it (the item step reuses the
@@ -1851,13 +1857,16 @@ def build_paginated_list_view(
     on_back: Callable[[discord.Interaction], Awaitable[None]],
     back_label: str = "Back",
     is_premium: bool = False,
+    on_extra: Optional[Callable[[discord.Interaction], Awaitable[None]]] = None,
 ) -> discord.ui.LayoutView:
     """Build a paginated list view for a PanelNode with kind="paginated_list".
 
     ``page_items`` is the already-sliced window for the current ``page`` (0-based);
     ``total`` is the full item count. When ``node.list_action_label`` is set and the
     page is non-empty, a per-item Select (bounded to the page, so never > 25 options)
-    dispatches the chosen item's value to ``on_pick``.
+    dispatches the chosen item's value to ``on_pick``. When
+    ``node.list_extra_action_label`` is set and ``on_extra`` is provided, a success
+    button (e.g. "Add Rule") leads the navigation row and dispatches to it.
     """
     builder = AdminLayoutBuilder()
 
@@ -1911,8 +1920,17 @@ def build_paginated_list_view(
 
     builder.add_item(editable_container(*editable_items))
 
-    # Navigation + back row.
+    # Navigation + back row. The extra action (a create flow, typically) leads it.
     nav_row = discord.ui.ActionRow()
+
+    if node.list_extra_action_label and on_extra is not None:
+        extra_btn = discord.ui.Button(
+            label=node.list_extra_action_label,
+            style=discord.ButtonStyle.success,
+            custom_id=cid("editor", "list_extra", node.key),
+        )
+        extra_btn.callback = on_extra
+        nav_row.add_item(extra_btn)
 
     prev_btn = discord.ui.Button(
         label="◀ Prev",

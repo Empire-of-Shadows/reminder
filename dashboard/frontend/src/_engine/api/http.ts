@@ -154,10 +154,33 @@ export async function apiFetch<T>(path: string, init?: ApiOptions): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new ApiError(res.status, body.detail ?? "");
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    throw new ApiError(res.status, formatDetail(body.detail));
   }
   return (await res.json()) as T;
+}
+
+/** Flatten an error `detail` to something a human can read.
+ *
+ * Hand-written raises carry a string, but FastAPI's own 422 validation errors
+ * carry a LIST of error objects - and stringifying that array produced
+ * unreadable text in every error banner (found 2026-08-24). Each entry becomes
+ * "field: message", joined with "; ". */
+function formatDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const err = d as { loc?: unknown; msg?: unknown };
+        const loc = Array.isArray(err?.loc)
+          ? err.loc.filter((part) => part !== "body").join(".")
+          : "";
+        const msg = typeof err?.msg === "string" ? err.msg : JSON.stringify(d);
+        return loc ? `${loc}: ${msg}` : msg;
+      })
+      .join("; ");
+  }
+  return detail == null ? "" : String(detail);
 }
 
 export function discordLoginUrl(redirectTo?: string): string {

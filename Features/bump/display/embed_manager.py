@@ -207,30 +207,6 @@ class TimerEmbedManager(commands.Cog):
             async with self._update_lock:
                 self._pending_updates.pop(guild_id, None)
 
-    async def manual_update(self, guild_id: int, channel_id: int):
-        try:
-            config = await self.bot.guild_config_manager.get_config(guild_id)
-            if not config: return False
-
-            role_id = config.bump_role
-            if not role_id: return False
-
-            from Features.bump.detection.handler import BumpHandler
-            # Finding the existing cog
-            bump_handler = self.bot.get_cog("BumpHandler")
-            if not bump_handler:
-                bump_handler = BumpHandler(self.bot)
-                
-            active_timers, expired_timers = await bump_handler.get_timers(config)
-
-            await self.schedule_embed_update(
-                guild_id, channel_id, role_id, active_timers, expired_timers
-            )
-            return True
-        except Exception as e:
-            logger.error(f"[{guild_id}] Error in manual embed update: {e}", exc_info=True)
-            return False
-
 
 async def setup(bot):
     logger.info("Setting up TimerEmbedManager Cog...")

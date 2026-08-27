@@ -2163,8 +2163,39 @@ class AdminCog(commands.Cog):
             return build_paginated_list_view(
                 node, page_items, page_state["page"], total, guild,
                 on_list_prev, on_list_next, on_list_pick, on_list_back,
-                back_label, is_premium=is_premium,
+                back_label, is_premium=is_premium, on_extra=on_list_extra,
             )
+
+        async def on_list_extra(extra_interaction: discord.Interaction):
+            """Run the node's extra action (a create wizard, typically) under the
+            same contract as an action node's ``on_run``. ``ctx.parent_node`` is
+            THIS list node, so a flow's back-to-panel lands back on the list."""
+            if node.list_extra_action is None:
+                return
+            ctx = ActionContext(
+                session=session,
+                parent_node=node,
+                grandparent_node=parent_node,
+                edit=True,
+                refresh_parent=refresh_parent,
+                is_premium=is_premium,
+                back_label=back_label,
+            )
+            try:
+                await node.list_extra_action(self, extra_interaction, guild, ctx)
+            except Exception:
+                logger.exception("list extra action failed for %s", node.key)
+                try:
+                    notice = build_notice_layout(
+                        "Something went wrong",
+                        f"Could not open **{node.list_extra_action_label or node.label}**.",
+                    )
+                    if extra_interaction.response.is_done():
+                        await extra_interaction.followup.send(view=notice, ephemeral=True)
+                    else:
+                        await extra_interaction.response.send_message(view=notice, ephemeral=True)
+                except Exception:
+                    logger.exception("failed to send extra-action failure notice for %s", node.key)
 
         async def on_list_prev(prev_interaction: discord.Interaction):
             page_state["page"] = max(0, page_state["page"] - 1)

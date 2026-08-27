@@ -3,6 +3,21 @@
 All notable, community-facing changes to ImperialReminder are recorded here in plain language.
 For the technical, commit-level history, see git.
 
+## [Unreleased] - 2026-08-26 (readable dashboard errors)
+
+### Fixed
+- **Dashboard error messages for invalid form input are readable now.** Some validation
+  errors used to render as raw data instead of a sentence naming the field and the problem.
+
+### Changed
+- **Picking a Bump Role that cannot actually be pinged is now refused.** Choosing @everyone,
+  a bot's own role, or a role with mentions turned off used to save without complaint and
+  then produce reminders that pinged nobody - the role name showed up as plain text and no
+  one was notified. The panel now explains why the pick will not work (and, for a role with
+  mentions turned off, tells you to switch on "Allow anyone to @mention this role" in the
+  role's settings) so you can fix it straight away instead of finding out the next time a
+  bump was missed.
+
 ## [Unreleased] - 2026-08-24 (Imperial Reminder is now 100% free)
 
 ### Changed

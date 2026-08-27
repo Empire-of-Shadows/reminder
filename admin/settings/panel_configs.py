@@ -80,6 +80,55 @@ async def _clear_role(guild_id: int) -> bool:
     return await cm.set_value(guild_id, "bump_role", 0)
 
 
+async def _bump_role_validator(guild, values) -> str | None:
+    """Refuse a bump role that could never actually ping anybody.
+
+    Bot policy, not engine policy: the reminder renders `<@&id>` and sends it
+    with a per-send AllowedMentions that allows only the configured role
+    (handler.py `_delayed_send`). Discord then delivers no ping at all - while
+    the text still renders - when the role is @everyone (stripped by
+    `everyone=False`), integration-managed, not mentionable, or gone. Every one
+    of those saves cleanly and then reminds nobody, with no error anywhere, so
+    the pick is refused at save time instead.
+
+    Hierarchy is deliberately NOT checked (see the node comment): the bot only
+    mentions this role, it never assigns it.
+
+    Engine contract (admin_cog select save): async (guild, values) -> an error
+    string to refuse with, or None when every value is acceptable.
+    """
+    for rid in values:
+        role = guild.get_role(int(rid))
+        if role is None:
+            return "Could not find that role. It may have been deleted."
+
+        if role.is_default():
+            return (
+                "**@everyone** cannot be used as the bump role - the reminder "
+                "would print the mention as plain text and ping nobody.\n\n"
+                "Pick a normal, mentionable role instead."
+            )
+
+        if role.managed:
+            return (
+                f"**@{role.name}** is managed by an integration (a bot role, the "
+                f"Server Booster role, or a subscription role). Discord does not "
+                f"let it be made mentionable, so the reminder would ping "
+                f"nobody.\n\nPick a normal, mentionable role instead."
+            )
+
+        if not role.mentionable:
+            return (
+                f"**@{role.name}** is not mentionable, so the reminder would "
+                f"print the role name as plain text and ping nobody.\n\n"
+                f"Turn on **Allow anyone to @mention this role** in Server "
+                f"Settings > Roles > @{role.name}, or pick a role that already "
+                f"has that turned on."
+            )
+
+    return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Bump bots accessors
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,11 +232,15 @@ SETUP_CONFIG = PanelNode(
             min_values=1,
             max_values=1,
             # The bot's full working set in this channel: it reads bump-bot posts
-            # (view), sends reminders and the setup nudge (send + embed), and
+            # (view), sends reminders (send - plain content only, no embed), and
             # refetches messages for WeBump's delayed edit and the empty-payload
             # fallback (read_message_history - handler.py on_message_edit/refetch).
-            # Both refetch sites are try/except-wrapped, so a missing History perm
-            # would weaken detection SILENTLY - refuse it at save time instead.
+            # embed_links is here for the countdown TIMER embed, not the reminder:
+            # when timers_channel is unset (0) the embed falls back into this
+            # channel (embed_manager._resolve_timer_channel, sent in
+            # _delayed_update). Both refetch sites are try/except-wrapped, so a
+            # missing History perm would weaken detection SILENTLY - refuse it at
+            # save time instead.
             required_channel_perms=[
                 "view_channel",
                 "send_messages",
@@ -197,7 +250,9 @@ SETUP_CONFIG = PanelNode(
         ),
         # Deliberately NO requires_role_manage on bump_role: the bot only MENTIONS
         # this role in reminders - it never assigns or edits it - and the hierarchy
-        # rule would wrongly reject above-bot roles an admin may want pinged.
+        # rule would wrongly reject above-bot roles an admin may want pinged. What
+        # the pick does have to be is PINGABLE, which is what the value_validator
+        # guards instead (_bump_role_validator).
         "bump_role": PanelNode(
             key="bump_role",
             label="Bump Role",
@@ -206,6 +261,7 @@ SETUP_CONFIG = PanelNode(
             get_values=_get_role,
             set_values=_set_role,
             clear_values=_clear_role,
+            value_validator=_bump_role_validator,
             min_values=1,
             max_values=1,
         ),
