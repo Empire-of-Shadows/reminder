@@ -21,7 +21,15 @@ interface AppHeaderProps {
 
 /** ImperialReminder's header: the shared AppShell wired with this bot's brand
  *  and nav. The shell owns the bar, the ecosystem switcher and the user block;
- *  the brand slot stays here because the bot renders it. */
+ *  the brand slot stays here because the bot renders it.
+ *
+ *  "Dashboard" and "Manage" are the fleet's words for these two links. They
+ *  used to read "Stats" and "Settings", which were also the names of things
+ *  further down the page, so one word meant two different destinations on the
+ *  same screen. The targets did not change, only what they are called.
+ *
+ *  Dashboard is marked `end` so it lights up on /me itself and not on every
+ *  page underneath it. */
 export default function AppHeader({
   user,
   title = "Imperial Reminder",
@@ -42,10 +50,10 @@ export default function AppHeader({
       }
       nav={user ? (
         <>
-          <NavLink to="/dashboard" className={navClass}>Stats</NavLink>
+          <NavLink to="/me" end className={navClass}>Dashboard</NavLink>
           <NavLink to="/me/privacy" className={navClass}>Privacy</NavLink>
           {user.can_access_settings_any && (
-            <NavLink to="/settings" className={navClass}>Settings</NavLink>
+            <NavLink to="/settings" className={navClass}>Manage</NavLink>
           )}
         </>
       ) : null}

@@ -6,42 +6,37 @@ import {
   Stat,
   Tile,
 } from "../../_engine/components/overview/Tile";
-import BumpStatusGrid from "../BumpStatusGrid";
 import { formatCountdown, formatRelative } from "./format";
 
 /**
- * The member's half of the dashboard home: what this server's bump reminder is
- * doing for the person reading the page.
+ * The admin's member half of the per-guild overview: what this server's bump
+ * reminder is doing for the person reading the page, as a roll-up only. The
+ * full per-bot grid is already in the Server overview below, and printing it
+ * twice is noise, not density.
+ *
+ * Only admins see this component since the 2026-09-01 member reshape: a plain
+ * member's page is MemberBumpView (timers for bump-role holders, an honest
+ * nothing-for-you note otherwise), so the old `detailed` per-bot branch here
+ * became unreachable and was removed.
  *
  * Both halves are independently nullable because they are fetched separately -
  * "will you be pinged" needs a live Discord roles lookup and must never be able
  * to take the timings down with it. A null half says so; it is never drawn as
  * an empty or zeroed one.
- *
- * `detailed` is the difference between the two panes. A plain member gets the
- * per-bot breakdown here because nothing else on their page has it. An admin
- * gets the roll-up only - the full per-bot grid is already in their Server
- * overview below, and printing it twice is noise, not density.
  */
 export default function MemberOverview({
   bumps,
   reminder,
-  detailed,
 }: {
   bumps: GuildBumpStats | null;
   reminder: MemberReminder | null;
-  detailed: boolean;
 }) {
-  // The wide half is whichever one has more to say. With the per-bot breakdown
-  // in it, that is the timings; without it, the roll-up is four lines and the
-  // ping answer is a paragraph plus three rows.
-  const bumpSpan = detailed ? 7 : 5;
-  const pingSpan = detailed ? 5 : 7;
-
+  // The ping answer is a paragraph plus three rows; the roll-up is four lines.
+  // The wide half is whichever one has more to say.
   return (
     <div className="ov-grid">
-      <YourBumps bumps={bumps} detailed={detailed} span={bumpSpan} />
-      <WillYouBePinged reminder={reminder} span={pingSpan} />
+      <YourBumps bumps={bumps} span={5} />
+      <WillYouBePinged reminder={reminder} span={7} />
     </div>
   );
 }
@@ -81,11 +76,9 @@ function rollUp(bumps: GuildBumpStats): RollUp {
 
 function YourBumps({
   bumps,
-  detailed,
   span,
 }: {
   bumps: GuildBumpStats | null;
-  detailed: boolean;
   span: 5 | 7;
 }) {
   if (!bumps) {
@@ -139,12 +132,6 @@ function YourBumps({
         />
         <KeyValue k="Still cooling down" v={waiting} />
       </div>
-      {detailed && (
-        <>
-          <Rule />
-          <BumpStatusGrid stats={bumps} />
-        </>
-      )}
     </Tile>
   );
 }

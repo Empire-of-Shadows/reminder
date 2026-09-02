@@ -3,6 +3,45 @@
 All notable, community-facing changes to ImperialReminder are recorded here in plain language.
 For the technical, commit-level history, see git.
 
+## [Unreleased] - 2026-09-01 (an honest server page for members)
+
+### Changed
+- **If you help bump your server, its dashboard page now shows you the bump timers.** Anyone
+  holding the server's bump reminder role sees each listing service the server is signed up
+  to, whether it is ready to bump right now, and how long until the next one comes off
+  cooldown. The countdowns tick live and are still posted in the server's bump channel as
+  well.
+- **Everyone else gets told plainly that this dashboard is for server admins.** It used to
+  show a page of server statistics to people with nothing on it they could change. Now it
+  says so in one short note, so you are not left hunting for something that was never there.
+- **We will never tell you there is nothing here for you when we simply could not check.**
+  If your roles in a server cannot be read at that moment, the page says it could not check
+  and asks you to reload, rather than guessing.
+
+## [Unreleased] - 2026-08-31 (easier to find your way around the dashboard)
+
+### Changed
+- **Every server now has its own address on the dashboard.** Opening a server from the home
+  page takes you to a page that is just that server, so you can bookmark it, share the link,
+  or use the back button and land where you expect.
+- **The tabs for a server are always on screen.** Once you are looking at a server you can see
+  its Overview, and Settings if you manage it, without going back to the home page first.
+  There is a "Servers" link on the bar to get back to your list.
+- **Clearer names in the top menu.** "Stats" is now "Dashboard" and "Settings" is now "Manage",
+  so the top menu no longer uses the same words as the tabs for a single server. They still go
+  to the same places.
+- **The management pages got their own tabs.** Settings and Change history for a server now sit
+  side by side, so moving between them is one click instead of a trip back through the menu.
+- Old dashboard links still work. Anything you saved earlier now sends you to the matching new
+  page instead of breaking.
+
+## [Unreleased] - 2026-08-28 (tidier setup guide)
+
+### Fixed
+- **The admin panel's setup guide no longer shows a stray gap under its numbered steps.**
+  Discord was treating the bold step numbers as the start of a list and adding extra space
+  after each one; the steps now render as intended.
+
 ## [Unreleased] - 2026-08-26 (readable dashboard errors)
 
 ### Fixed

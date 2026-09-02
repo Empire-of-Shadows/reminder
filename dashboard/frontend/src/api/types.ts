@@ -208,6 +208,37 @@ export interface MemberReminder {
   status: "yes" | "no" | "no_role" | "unknown";
 }
 
+// ── The member's whole server page (GET /api/guilds/{id}/my-bump-view) ────
+//
+// The dashboard is an admin tool. For somebody without panel access there are
+// only two honest things to say about a server, and this one payload decides
+// which: the bump countdowns, or that this place is for admins.
+
+/** One enabled bump bot, as a member reads it. */
+export interface MyBumpTimer {
+  /** Display name of the listing service, e.g. "Disboard". */
+  bot: string;
+  ready_now: boolean;
+  /** Unix seconds the cooldown ends. null whenever `ready_now` is true - there
+   *  is no future moment to name for something already ready. */
+  ready_at: number | null;
+}
+
+export interface MyBumpView {
+  /** null means the roles lookup did not resolve. Render it as "we could not
+   *  check", NEVER as "no" - telling somebody who does bump the server that
+   *  there is nothing here for them is the one wrong answer this can give. */
+  holds_bump_role: boolean | null;
+  /** null means the timings could not be computed. Render as unknown, never as
+   *  "no bots are tracked". An empty list is a real answer: none are. */
+  timers: MyBumpTimer[] | null;
+  /** Whether this server has both a bump channel and a reminder role set. */
+  configured: boolean;
+  /** Server's current unix time - anchor countdowns to it, not the browser's
+   *  clock, so a skewed local clock cannot make a bump look ready early. */
+  server_time: number;
+}
+
 // ── Audit log (GET /api/guilds/{id}/audit-log) ────────────────────────────
 
 /** One change, folded out of the three shapes the collection actually holds. */

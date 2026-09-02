@@ -22,6 +22,7 @@ import {
   TextareaField,
   ToggleField,
 } from "../_engine/components/settings/fields";
+import AdminNav from "../components/AdminNav";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PageSkeleton from "../components/PageSkeleton";
@@ -422,16 +423,14 @@ export default function SettingsPage() {
 
   return (
     <div className="app-layout">
-      <AppHeader
-        title="Server Settings"
-        left={
-          <Link to="/dashboard" className="btn btn-secondary" style={{ marginLeft: 12 }}>
-            &larr; Servers
-          </Link>
-        }
-      />
+      <AppHeader title="Server Settings" />
 
       <div className="page">
+        {/* The admin tab bar replaces the back button that used to sit in the
+            header: it goes back to the same place and also says what the other
+            page for this server is. */}
+        <AdminNav guildId={guildId} />
+
         {error && (
           <div className="alert danger" role="alert" style={{ marginTop: 16 }}>
             {error}
@@ -497,7 +496,7 @@ export default function SettingsPage() {
                       {showHistory && (
                         <Link
                           className="set-rail__item"
-                          to={`/settings/${guildId}/audit-log`}
+                          to={`/settings/guilds/${guildId}/audit-log`}
                         >
                           <span>Change history</span>
                         </Link>

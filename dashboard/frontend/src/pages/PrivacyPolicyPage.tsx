@@ -132,8 +132,9 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               Server managers can view and change all stored configuration any time from the{" "}
-              <Link to="/settings">Settings</Link> page, or remove it by removing the bot from
-              the server. For anything the self-service page does not cover, contact{" "}
+              <Link to="/settings">Manage</Link> section of this dashboard, or remove it by
+              removing the bot from the server. For anything the self-service page does not
+              cover, contact{" "}
               <a href="mailto:support@eosofficial.club">support@eosofficial.club</a>.
             </p>
           </section>

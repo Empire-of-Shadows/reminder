@@ -130,7 +130,15 @@ Configured in `storage/sub_systems/bump_config.py`:
 - **Add a bump bot**: extend `BUMP_BOTS_INFO`, `BUMP_BOTS`, `DEFAULT_GUILD_CONFIG` delays/timestamps, `SUCCESS_KEYWORDS`, `BUMP_BOTS_CHOICES` in `sub_systems/bump_config.py`.
 - **Schema changes**: additive `GuildConfig` fields need no migration (`from_dict` fills defaults). Guild config + bump timestamps are LIVE production data - migrate, never drop. Removing a field ships an idempotent script under `../../TestsAndMigrations/ImperialReminder/migrations/scripts/` (the tree moved out of this repo on 2026-08-08; `_common.py` is the harness: dry run by default, `--apply` to write a backup then `$unset`, `--rollback <file>` to replay it). Run them from `TestsAndMigrations/ImperialReminder/` as `python -m migrations.scripts.<name>`. Run the dry run, read its report, then apply.
 - **Engine changes**: edit the master in `EmpireSystems/`, re-run the sync tool with `--bot reminder`, verify `--check`.
-- **Debugging detection**: watch `[on_message]` / `[on_message_edit]` / `[extract_all_text]` log lines.
+- **Debugging detection**: watch the `[on_message]` / `[on_message_edit]` log lines (the old `[extract_all_text]` tag no longer exists - corrected 2026-09-01).
+- **Console log colors** (engine feature, opt-in in `docker/.env`, fleet pass 2026-09-01):
+  `LOG_COLOR=force` emits ANSI without a TTY so `docker compose logs` over SSH renders
+  colored; `LOG_HIGHLIGHT=true` colors the `module:function:line` segment by FEATURE
+  (this bot's logger names are in the fleet table in the engine master
+  `storage_engine/log/factory.py`) and paints ids, durations, counts, `key=` labels and
+  outcome words inside messages; `LOG_SOURCE_COLORS=keyword:color,...` overrides the
+  table without code. Files and JSON stay plain. Stdlib `extra=` fields render as a
+  trailing `| k=v` on every sink.
 
 ## Important Notes
 

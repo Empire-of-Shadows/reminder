@@ -18,6 +18,15 @@ import { formatCount, formatDayLabel, formatRelative as formatIsoRelative } from
 import BumpStatusGrid from "../BumpStatusGrid";
 import { changeLabel, formatCountdown } from "./format";
 
+/** Where one setting is edited. This bot's settings page lives under
+ *  `/settings/guilds/<id>/settings`, not at the engine's older flat default, so
+ *  the links here and the builder handed to FeatureStrip both come from one
+ *  place rather than being spelled out five times. */
+function settingsHref(guildId: string, section?: string): string {
+  const base = `/settings/guilds/${guildId}/settings`;
+  return section ? `${base}?s=${encodeURIComponent(section)}` : base;
+}
+
 /** The server home. Every section of the payload can be null on its own. */
 export default function AdminOverview({ overview }: { overview: GuildOverview }) {
   const guildId = overview.guild_id;
@@ -50,12 +59,16 @@ function IsItWorking({ overview }: { overview: GuildOverview }) {
         </>
       }
       action={
-        <Link className="ov-link" to={`/settings/${guildId}`}>
+        <Link className="ov-link" to={settingsHref(guildId)}>
           Change settings
         </Link>
       }
     >
-      <FeatureStrip guildId={guildId} features={overview.features} />
+      <FeatureStrip
+        guildId={guildId}
+        features={overview.features}
+        settingsHref={(key) => settingsHref(guildId, key)}
+      />
     </Tile>
   );
 }
@@ -86,7 +99,7 @@ function BumpTimers({
         title="Bump timers"
         chips={<span className="ov-chip ov-chip--warn">No bots selected</span>}
         action={
-          <Link className="ov-link" to={`/settings/${guildId}?s=bots`}>
+          <Link className="ov-link" to={settingsHref(guildId, "bots")}>
             Choose bump bots
           </Link>
         }
@@ -123,7 +136,7 @@ function BumpTimers({
         </>
       }
       action={
-        <Link className="ov-link" to={`/settings/${guildId}?s=bots`}>
+        <Link className="ov-link" to={settingsHref(guildId, "bots")}>
           Bump bots
         </Link>
       }
@@ -174,7 +187,7 @@ function SetupHealth({ guildId, setup }: { guildId: string; setup: SetupOverview
         )
       }
       action={
-        <Link className="ov-link" to={`/settings/${guildId}?s=bumps`}>
+        <Link className="ov-link" to={settingsHref(guildId, "bumps")}>
           Edit
         </Link>
       }
@@ -231,7 +244,7 @@ function ChangeActivity({ guildId, changes }: { guildId: string; changes: Change
         ) : null
       }
       action={
-        <Link className="ov-link" to={`/settings/${guildId}?s=access`}>
+        <Link className="ov-link" to={settingsHref(guildId, "access")}>
           Who can manage
         </Link>
       }

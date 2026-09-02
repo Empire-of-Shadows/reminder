@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { AuditLogRow, AuditLogSummary } from "../api/types";
 import { formatError } from "../_engine/api/formatError";
 import { formatDuration } from "../components/overview/format";
 import { formatDateTime, formatRelative } from "../_engine/format";
 import { KeyValue, SectionUnavailable, Stat, Tile } from "../_engine/components/overview/Tile";
+import AdminNav from "../components/AdminNav";
 import AppHeader from "../components/AppHeader";
 import PageSkeleton from "../components/PageSkeleton";
 
@@ -116,20 +117,14 @@ export default function AuditLogPage() {
 
   return (
     <div className="app-layout">
-      <AppHeader
-        title="Change history"
-        left={
-          <Link
-            to={`/settings/${guildId}?s=access`}
-            className="btn btn-secondary"
-            style={{ marginLeft: 12 }}
-          >
-            &larr; Settings
-          </Link>
-        }
-      />
+      <AppHeader title="Change history" />
 
       <div className="page">
+        {/* The admin tab bar replaces the back button that used to sit in the
+            header: Settings is one of its tabs, so the way back is still one
+            click and it now says where else this server can be managed. */}
+        <AdminNav guildId={guildId} />
+
         {error && (
           <div className="alert danger" role="alert" style={{ marginTop: 16 }}>
             {error}

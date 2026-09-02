@@ -1729,6 +1729,31 @@ class AdminCog(commands.Cog):
                     key = str(parsed)
             return True, key, ""
 
+        async def _refuse_entry(resp_interaction, ui_interaction, notice_view) -> None:
+            """Answer a refused entry AND redraw the editor on its stored state.
+
+            Same contract as ``_show_select``'s ``_refuse``: without the redraw a
+            refused pick stays highlighted in whatever picker screen message 2 is
+            showing, looking accepted. The rebuilt entries view mints fresh select
+            ids (see panel_engine._select_nonce), so the client always resets.
+            Answers whichever response is still open: a modal submit spends its
+            response on the notice, a component defers-then-follows-up, and an
+            already-answered interaction just gets the followup.
+            """
+            if resp_interaction.response.is_done():
+                await resp_interaction.followup.send(view=notice_view, ephemeral=True)
+            elif resp_interaction.type is discord.InteractionType.modal_submit:
+                await resp_interaction.response.send_message(view=notice_view, ephemeral=True)
+            else:
+                await resp_interaction.response.defer(ephemeral=True)
+                await resp_interaction.followup.send(view=notice_view, ephemeral=True)
+            try:
+                await ui_interaction.edit_original_response(
+                    view=self._rebind_session_view(session, await _build_view())
+                )
+            except discord.HTTPException as http_exc:
+                logger.warning("Could not redraw dict editor after refusal: %s", http_exc)
+
         async def _persist(ui_interaction, resp_interaction, raw_key, raw_value, *, original_key=None):
             """Validate and write a single entry.
 
@@ -1736,13 +1761,14 @@ class AdminCog(commands.Cog):
             with the rebuilt editor on success. ``resp_interaction`` is the one
             Discord is still waiting on and must be answered. They are the same
             interaction whenever the final step is a component (the role picker)
-            instead of a modal.
+            instead of a modal. Every refusal goes through ``_refuse_entry`` so
+            the screen is redrawn and no stale pick survives.
             """
             ok, key, error_msg = _validate_key(raw_key)
             if not ok:
-                await resp_interaction.response.send_message(
-                    view=build_notice_layout("Invalid Key", error_msg),
-                    ephemeral=True,
+                await _refuse_entry(
+                    resp_interaction, ui_interaction,
+                    build_notice_layout("Invalid Key", error_msg),
                 )
                 return
 
@@ -1755,9 +1781,9 @@ class AdminCog(commands.Cog):
                 except (TypeError, ValueError):
                     perm_ok, perm_err = False, "That channel could not be read. Please pick it again."
                 if not perm_ok:
-                    await resp_interaction.response.send_message(
-                        view=build_notice_layout("Permission Issue", perm_err),
-                        ephemeral=True,
+                    await _refuse_entry(
+                        resp_interaction, ui_interaction,
+                        build_notice_layout("Permission Issue", perm_err),
                     )
                     return
 
@@ -1767,29 +1793,41 @@ class AdminCog(commands.Cog):
                 try:
                     role_id = int(raw_value)
                 except (TypeError, ValueError):
-                    await resp_interaction.response.send_message(
-                        view=build_notice_layout(
+                    await _refuse_entry(
+                        resp_interaction, ui_interaction,
+                        build_notice_layout(
                             "Invalid Role", "That role could not be read. Please pick it again.",
                         ),
-                        ephemeral=True,
                     )
                     return
                 perm_ok, perm_err = check_assignable_role(guild, role_id)
                 if not perm_ok:
-                    await resp_interaction.response.send_message(
-                        view=build_notice_layout("Permission Issue", perm_err),
-                        ephemeral=True,
+                    await _refuse_entry(
+                        resp_interaction, ui_interaction,
+                        build_notice_layout("Permission Issue", perm_err),
                     )
                     return
+                # Business-rule gate on the picked role (a native RoleSelect
+                # cannot exclude roles, so conflicts are refused here instead).
+                if node.dict_value_role_validator:
+                    rule_ok, rule_err = await node.dict_value_role_validator(guild, role_id)
+                    if not rule_ok:
+                        await _refuse_entry(
+                            resp_interaction, ui_interaction,
+                            build_notice_layout(
+                                "Role Already In Use", rule_err or "That role cannot be used here.",
+                            ),
+                        )
+                        return
                 value = str(role_id)
             elif node.dict_value_validator:
                 ok, error_msg, parsed = node.dict_value_validator(raw_value)
                 if not ok:
-                    await resp_interaction.response.send_message(
-                        view=build_notice_layout(
+                    await _refuse_entry(
+                        resp_interaction, ui_interaction,
+                        build_notice_layout(
                             "Invalid Value", error_msg or "Invalid value.",
                         ),
-                        ephemeral=True,
                     )
                     return
                 value = parsed
@@ -1797,9 +1835,9 @@ class AdminCog(commands.Cog):
                 value = raw_value
 
             if not self._check_cooldown(ui_interaction.user.id, node.key, guild.id):
-                await resp_interaction.response.send_message(
-                    view=build_notice_layout("Slow Down", "Saving too quickly, please wait a moment."),
-                    ephemeral=True,
+                await _refuse_entry(
+                    resp_interaction, ui_interaction,
+                    build_notice_layout("Slow Down", "Saving too quickly, please wait a moment."),
                 )
                 return
             await resp_interaction.response.defer(ephemeral=True)
@@ -1811,12 +1849,12 @@ class AdminCog(commands.Cog):
                 and key not in current
                 and len(current) >= node.dict_max_entries
             ):
-                await resp_interaction.followup.send(
-                    view=build_notice_layout(
+                await _refuse_entry(
+                    resp_interaction, ui_interaction,
+                    build_notice_layout(
                         "Limit Reached",
                         f"Maximum **{node.dict_max_entries}** entries reached.",
                     ),
-                    ephemeral=True,
                 )
                 return
 
@@ -1843,12 +1881,12 @@ class AdminCog(commands.Cog):
                 if refresh_parent:
                     await refresh_parent()
             else:
-                await resp_interaction.followup.send(
-                    view=build_notice_layout(
+                await _refuse_entry(
+                    resp_interaction, ui_interaction,
+                    build_notice_layout(
                         "Failed to save",
                         f"Could not save **{node.label}** entry.",
                     ),
-                    ephemeral=True,
                 )
 
         # -- Picker steps (only reached when a new dict_*_kind is set) ----------

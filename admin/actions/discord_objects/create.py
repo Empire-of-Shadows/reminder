@@ -80,14 +80,18 @@ def validator_for_channel_kind(kind: str):
 def channel_kind_for_types(channel_types) -> str:
     """Map a ``PanelNode.channel_types`` filter to the create ``kind``.
 
-    A single-type filter creates that type (category-only pickers create a
-    category, voice-only a voice channel); anything else - no filter or a mixed
-    list - creates a text channel, the only kind every picker accepts."""
-    if channel_types and len(channel_types) == 1:
-        name = getattr(channel_types[0], "name", "")
-        if name == "category":
+    The created channel must be one the picker itself ACCEPTS: a filter of
+    only categories creates a category, a filter of only voice kinds (voice
+    and/or stage) creates a voice channel, and anything else - no filter, or
+    a list that admits text - creates a text channel. The old rule matched
+    single-type filters only, so a voice+stage picker fell through to TEXT
+    and minted a channel its own picker could not select (found live
+    2026-08-28 on ecom's voice Disabled Channels picker)."""
+    if channel_types:
+        names = {getattr(t, "name", "") for t in channel_types}
+        if names and names <= {"category"}:
             return "category"
-        if name in ("voice", "stage_voice"):
+        if names and names <= {"voice", "stage_voice"}:
             return "voice"
     return "text"
 

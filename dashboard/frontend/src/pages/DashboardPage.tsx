@@ -1,42 +1,33 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api, fetchPublicStats, inviteLink, type PublicStats } from "../api/client";
-import type {
-  Guild,
-  GuildBumpStats,
-  GuildOverview,
-  MemberReminder,
-  User,
-} from "../api/types";
+import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, fetchPublicStats, type PublicStats } from "../api/client";
+import type { Guild, User } from "../api/types";
 import { formatError } from "../_engine/api/formatError";
 import { formatCount } from "../_engine/format";
 import ServerPicker, { pickerMeta } from "../_engine/components/overview/ServerPicker";
-import SignalStrip, { type Signal } from "../_engine/components/overview/SignalStrip";
 import { Tile } from "../_engine/components/overview/Tile";
 import AppHeader from "../components/AppHeader";
 import PageSkeleton from "../components/PageSkeleton";
-import AdminOverview from "../components/overview/AdminOverview";
-import MemberOverview from "../components/overview/MemberOverview";
-import { formatCountdown, formatRelative } from "../components/overview/format";
 
 /*
  * The dashboard home.
  *
- * What this replaced: a horizontally-scrolling pill bar of servers over one
- * grid of bump cards, with no width cap - on a wide monitor the cards held a
- * countdown in a box the width of the screen, and nothing on the page answered
- * "is any of this actually working". The layout is now the shared engine one:
- * a command row (which server, and the numbers that are only numbers) above a
- * 12-column grid of tiles.
+ * Two things, and only these two: how much work the bot is doing across the
+ * whole Empire, and the picker that takes you to one of your own servers.
  *
- * Composition order is member first, then server. Somebody with Manage Server
- * is a member of that server before they are its administrator, and "does this
- * thing ping ME" is the question they arrived with. The server sections follow
- * underneath for the people who can act on them.
+ * A single server's view is NOT here. It lives at
+ * `/me/guilds/:id/overview`, and picking a server here navigates there. This
+ * page used to render the picked server inline off a `?guild=` parameter, which
+ * left one per-server view addressed by a query string while every other page
+ * used a path, and hid that server's tab bar until you had already left the page
+ * it was on. The old `/me?guild=` and `/dashboard?guild=` links are still out
+ * there in Discord messages and bookmarks, so both are redirected to the
+ * server's overview rather than dropped (see App).
  *
- * Every member request is additive and independently failure-tolerant: the
- * roles lookup behind "will you be pinged" talks to Discord and can fail on its
- * own without costing the page the timings, the server overview, or each other.
+ * Imperial Reminder has nothing per-member to total up across servers - it
+ * tracks servers, not people - so there is deliberately no combined activity
+ * section under the picker. The Empire-wide counts in the hero are the honest
+ * cross-server thing this bot can say.
  */
 
 function StatsHero({ stats }: { stats: PublicStats | null }) {
@@ -74,67 +65,23 @@ function StatsHero({ stats }: { stats: PublicStats | null }) {
   );
 }
 
-/** What loaded for the member half of the selected server. */
-interface MemberPane {
-  bumps: GuildBumpStats | null;
-  reminder: MemberReminder | null;
-}
-
-const EMPTY_MEMBER: MemberPane = { bumps: null, reminder: null };
-
 export default function DashboardPage() {
+  const navigate = useNavigate();
+
   const [user, setUser] = useState<User | null>(null);
   const [guilds, setGuilds] = useState<Guild[]>([]);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<PublicStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedGuildId = searchParams.get("guild");
-  const [overview, setOverview] = useState<GuildOverview | null>(null);
-  const [member, setMember] = useState<MemberPane>(EMPTY_MEMBER);
-  const [paneLoading, setPaneLoading] = useState(false);
-  const [overviewError, setOverviewError] = useState<string | null>(null);
-
-  // The ?guild= value the page was opened with. A shared link always wins over
-  // the default-to-your-own-server behaviour below.
-  const openedWith = useRef<string | null>(searchParams.get("guild"));
-
-  function selectGuild(id: string | null) {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (id) next.set("guild", id);
-        else next.delete("guild");
-        return next;
-      },
-      { replace: true },
-    );
-  }
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [u, g, invite] = await Promise.all([
-          api.me(),
-          api.guilds(),
-          api.botInviteUrl().catch(() => ({ url: null })),
-        ]);
+        const [u, g] = await Promise.all([api.me(), api.guilds()]);
         if (!alive) return;
         setUser(u);
         setGuilds(g);
-        setInviteUrl(invite.url);
-        if (!openedWith.current) {
-          // Land on a server the bot is actually in, so the page has something
-          // to say on arrival - one this person manages if there is one, and
-          // otherwise any server they share with the bot, which is all a plain
-          // member has. Written with replace, so the URL stays shareable.
-          const usable = g.filter((entry) => entry.bot_in_guild && !entry.setup_required);
-          const own = usable.find((entry) => entry.panel_role === "admin") ?? usable[0];
-          if (own) selectGuild(own.id);
-        }
       } catch (e) {
         if (alive) setError(formatError(e));
       } finally {
@@ -147,79 +94,16 @@ export default function DashboardPage() {
     return () => {
       alive = false;
     };
-    // Runs once: the initial guild comes from the URL, captured above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedGuild = useMemo(
-    () => (selectedGuildId ? guilds.find((g) => g.id === selectedGuildId) ?? null : null),
-    [guilds, selectedGuildId],
-  );
-
-  const botPresent =
-    selectedGuild !== null && selectedGuild.bot_in_guild && !selectedGuild.setup_required;
-  const isAdmin = botPresent && selectedGuild?.panel_role === "admin";
-
-  // Fetch the selected server's panes whenever the selection changes.
-  useEffect(() => {
-    if (!selectedGuildId || !botPresent) {
-      setOverview(null);
-      setMember(EMPTY_MEMBER);
-      setOverviewError(null);
-      return;
-    }
-    let alive = true;
-    setPaneLoading(true);
-    setOverviewError(null);
-
-    // Every member request swallows its own failure and resolves to null, so
-    // one of them being down can never blank the others or the server sections.
-    const swallow = <T,>(p: Promise<T>): Promise<T | null> =>
-      p.then(
-        (value) => value,
-        (e) => {
-          console.error("Member section fetch failed", e);
-          return null;
-        },
-      );
-
-    const memberRequest = Promise.all([
-      swallow(api.memberBumps(selectedGuildId)),
-      swallow(api.memberReminder(selectedGuildId)),
-    ]).then(([bumps, reminder]) => ({ bumps, reminder }));
-
-    const overviewRequest: Promise<GuildOverview | null | "error"> = isAdmin
-      ? api.guildOverview(selectedGuildId).catch((e) => {
-          if ((e as Error).message === "Unauthorized") return null;
-          console.error("Server overview fetch failed", e);
-          return "error" as const;
-        })
-      : Promise.resolve(null);
-
-    Promise.all([memberRequest, overviewRequest])
-      .then(([memberPane, serverOverview]) => {
-        if (!alive) return;
-        setMember(memberPane);
-        if (serverOverview === "error") {
-          setOverview(null);
-          setOverviewError("This server's overview could not be loaded.");
-        } else {
-          setOverview(serverOverview);
-        }
-      })
-      .finally(() => {
-        if (alive) setPaneLoading(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [selectedGuildId, botPresent, isAdmin]);
+  // Picking a server is navigation now, not selection: this page holds no
+  // per-server state to set. "All servers" is what this page already is, so
+  // choosing it stays put rather than routing anywhere.
+  function selectGuild(id: string | null) {
+    if (id) navigate(`/me/guilds/${id}/overview`);
+  }
 
   if (loading) return <PageSkeleton />;
-
-  const anyMemberSection =
-    member.bumps !== null || member.reminder !== null;
 
   return (
     <div className="app-layout">
@@ -238,11 +122,12 @@ export default function DashboardPage() {
           <div className="ov-command">
             <ServerPicker
               guilds={guilds}
-              selectedGuildId={selectedGuildId}
+              // Nothing is ever selected here: this page IS the list of your
+              // servers, and choosing one leaves it for that server's overview.
+              selectedGuildId={null}
               onSelect={selectGuild}
-              meta={pickerMeta(selectedGuild, guilds.length, "Imperial Reminder")}
+              meta={pickerMeta(null, guilds.length, "Imperial Reminder")}
             />
-            <SignalStrip signals={signalsFor(overview, member.bumps)} />
           </div>
         )}
 
@@ -256,7 +141,7 @@ export default function DashboardPage() {
               </p>
             </Tile>
           </QuietGrid>
-        ) : !selectedGuild ? (
+        ) : (
           <QuietGrid>
             <Tile span={12} quiet title="Pick a server">
               <p className="ov-body">
@@ -265,81 +150,6 @@ export default function DashboardPage() {
               </p>
             </Tile>
           </QuietGrid>
-        ) : selectedGuild.setup_required ? (
-          <QuietGrid>
-            <Tile
-              span={12}
-              quiet
-              title="Not added yet"
-              chips={<span className="ov-chip ov-chip--warn">Bot missing</span>}
-            >
-              <p className="ov-body">
-                Imperial Reminder is not in <strong>{selectedGuild.name}</strong> yet. Add it,
-                then come back here to set the bump channel and reminder role.
-              </p>
-              {inviteUrl && (
-                <div className="admin-actions">
-                  <a
-                    className="btn btn-primary"
-                    href={inviteLink(inviteUrl, selectedGuild.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Invite the bot
-                  </a>
-                </div>
-              )}
-            </Tile>
-          </QuietGrid>
-        ) : paneLoading ? (
-          <div className="ov-grid" role="status" aria-busy="true">
-            <div className="skeleton-card s7" />
-            <div className="skeleton-card s5" />
-            <div className="skeleton-card s12" />
-            <div className="skeleton-card s4" />
-            <div className="skeleton-card s3" />
-            <div className="skeleton-card s5" />
-            <span className="visually-hidden">Loading this server</span>
-          </div>
-        ) : (
-          <>
-            <h2 className="section-title" style={{ margin: "4px 0 12px" }}>
-              Your reminders
-            </h2>
-            <MemberOverview
-              bumps={member.bumps}
-              reminder={member.reminder}
-              detailed={!isAdmin}
-            />
-
-            {isAdmin && (
-              <>
-                <h2 className="section-title" style={{ margin: "28px 0 12px" }}>
-                  Server overview
-                </h2>
-                {overview ? (
-                  <AdminOverview overview={overview} />
-                ) : (
-                  <QuietGrid>
-                    <Tile span={12} quiet title="Not loaded">
-                      <p className="ov-body" role="alert">
-                        {overviewError ??
-                          "This server's overview could not be loaded. Refresh to try again."}
-                      </p>
-                    </Tile>
-                  </QuietGrid>
-                )}
-              </>
-            )}
-
-
-            {!anyMemberSection && !isAdmin && (
-              <p className="ov-muted" style={{ marginTop: 16 }}>
-                Nothing about this server could be loaded just now. That is a fault on our
-                side, not an empty server - reload the page to try again.
-              </p>
-            )}
-          </>
         )}
       </div>
     </div>
@@ -349,67 +159,4 @@ export default function DashboardPage() {
 /** One tile on its own row, for the states that are not a full composition. */
 function QuietGrid({ children }: { children: ReactNode }) {
   return <div className="ov-grid">{children}</div>;
-}
-
-/* ── The command-row numbers ───────────────────────────────────────── */
-
-function signalsFor(
-  overview: GuildOverview | null,
-  memberBumps: GuildBumpStats | null,
-): Signal[] {
-  const bumps = overview?.bumps ?? null;
-
-  // An admin reads the server's roll-up; a member reads the same timings
-  // computed from the rows they are allowed to see. Neither is invented.
-  if (bumps) {
-    const signals: Signal[] = [
-      { key: "tracked", value: formatCount(bumps.enabled_count), label: "Bots tracked" },
-      { key: "ready", value: formatCount(bumps.ready_count), label: "Ready to bump" },
-      {
-        key: "next",
-        value:
-          bumps.next_due !== null
-            ? formatCountdown(bumps.next_due, bumps.now).replace(/^in /, "")
-            : "-",
-        label: bumps.next_due !== null ? "Until next bump" : "Next bump - none due",
-      },
-      {
-        key: "last",
-        value: bumps.last_bump !== null ? formatRelative(bumps.last_bump, bumps.now) : "-",
-        label: bumps.last_bump !== null ? "Last bump" : "Last bump - none seen",
-      },
-    ];
-    return signals;
-  }
-
-  if (!memberBumps) return [];
-
-  const now = memberBumps.server_time;
-  let ready = 0;
-  let nextDue: number | null = null;
-  let lastBump: number | null = null;
-  for (const bot of memberBumps.bots) {
-    if (bot.status === "ready") ready += 1;
-    else if (bot.next_due !== null) {
-      nextDue = nextDue === null ? bot.next_due : Math.min(nextDue, bot.next_due);
-    }
-    if (bot.last_bump !== null) {
-      lastBump = lastBump === null ? bot.last_bump : Math.max(lastBump, bot.last_bump);
-    }
-  }
-
-  return [
-    { key: "tracked", value: formatCount(memberBumps.enabled_count), label: "Bots tracked" },
-    { key: "ready", value: formatCount(ready), label: "Ready to bump" },
-    {
-      key: "next",
-      value: nextDue !== null ? formatCountdown(nextDue, now).replace(/^in /, "") : "-",
-      label: nextDue !== null ? "Until next bump" : "Next bump - none due",
-    },
-    {
-      key: "last",
-      value: lastBump !== null ? formatRelative(lastBump, now) : "-",
-      label: lastBump !== null ? "Last bump" : "Last bump - none seen",
-    },
-  ];
 }

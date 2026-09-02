@@ -146,8 +146,13 @@ async def load_cogs(bot, cog_directories: list[str],
         failed_logs.insert(0, f"{s}Failed to load the following cogs:\n")
     success_logs.append(f"{s}Successfully loaded cogs:\n")
 
-    final_logs = failed_logs + success_logs if failed_logs else success_logs
-    logger.info("\n" + "".join(final_logs) + f"{s}Cog loading process completed.\n")
+    # Failures get their own ERROR record, never a line inside the INFO blob.
+    # Learned 2026-08-28: an admin-cog load failure shipped inside the INFO
+    # summary and was missed on the production host - the bot ran with no
+    # admin panel and nothing at ERROR level said so.
+    if failed_logs:
+        logger.error("\n" + "".join(failed_logs))
+    logger.info("\n" + "".join(success_logs) + f"{s}Cog loading process completed.\n")
 
 
 async def attach_attribute(bot, attribute_name, attribute_value):

@@ -82,7 +82,9 @@ ADMINISTRATOR_PERMISSION = 0x8
 # ── Shared dashboard-engine seam values (read by dashboard/_engine/) ──────────
 # OAuth redirect allowlist (regex, anchored ^...$) + fallback, used by _engine/auth/oauth.py.
 OAUTH_REDIRECT_ALLOWLIST = r"^https?://(localhost(:\d+)?|([a-z0-9-]+\.)?eosofficial\.club)(/.*)?$"
-OAUTH_DEFAULT_REDIRECT = "/dashboard"
+# "/me" is the canonical member home since the 2026-08-31 IA rework; the old
+# "/dashboard" address survives only as a client-side redirect to it.
+OAUTH_DEFAULT_REDIRECT = "/me"
 
 # Rate-limit route table for _engine/rate_limit.py: (path-prefix, bucket, max, window_s).
 # First match wins, so specific prefixes precede their parents. bot-invite-url is

@@ -11,6 +11,7 @@ import type {
   GuildBumpStats,
   GuildOverview,
   MemberReminder,
+  MyBumpView,
   ScopeGuild,
   DeleteUserDataResponse,
   UserDataSummary,
@@ -63,6 +64,11 @@ export const api = {
     apiFetch<GuildBumpStats>(`/api/guilds/${guildId}/member/bumps`),
   memberReminder: (guildId: string) =>
     apiFetch<MemberReminder>(`/api/guilds/${guildId}/member/reminder`),
+
+  // The whole member composition in one call - the server page uses this
+  // instead of the two above when the reader has no panel access.
+  myBumpView: (guildId: string) =>
+    apiFetch<MyBumpView>(`/api/guilds/${guildId}/my-bump-view`),
 
   // Change history, newest first. `before` is the previous page's next_cursor.
   auditLog: (guildId: string, before?: string | null, limit = 50) =>

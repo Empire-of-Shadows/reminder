@@ -14,6 +14,8 @@ added as pure config trees without writing custom view builder code.
 
 from __future__ import annotations
 
+import uuid
+
 import discord
 from dataclasses import dataclass, field
 from typing import Callable, Awaitable, Optional
@@ -147,6 +149,12 @@ class PanelNode:
     #   it reaches storage. Unset (the default) means keys are only checked for
     #   emptiness, exactly as before.
     # dict_max_entries: optional cap on the number of entries.
+    # dict_value_role_validator: async (guild, role_id: int) -> (ok, error_msg).
+    #   Only read when dict_value_kind == "role", where dict_value_validator is
+    #   skipped: a business-rule gate on the picked role (e.g. "this role is
+    #   already used by another ladder"), run AFTER the assignability
+    #   permission check. Unset (the default) means role values are only
+    #   permission-checked, exactly as before.
     dict_get_values: Optional[Callable] = None
     dict_set_value: Optional[Callable] = None
     dict_remove_value: Optional[Callable] = None
@@ -154,6 +162,7 @@ class PanelNode:
     dict_value_label: str = "Value"
     dict_value_validator: Optional[Callable] = None
     dict_key_validator: Optional[Callable] = None
+    dict_value_role_validator: Optional[Callable] = None
     dict_max_entries: Optional[int] = None
 
     # dict_editor input shapes. Both default to "text", which is the original
@@ -604,7 +613,9 @@ def build_menu_view(
                 ))
             select = discord.ui.Select(
                 placeholder="Select a category...",
-                custom_id=cid("editor", "select", node.key),
+                # Fresh per-render id so a lock/pre-check refusal redraw always
+                # clears the refused pick - see _select_nonce.
+                custom_id=f'{cid("editor", "select", node.key)}:{_select_nonce()}',
                 options=options,
             )
 
@@ -647,9 +658,23 @@ def build_menu_view(
     return builder.build()
 
 
+def _select_nonce() -> str:
+    """A fresh per-render suffix for a select's custom id.
+
+    Discord clients keep a select's last pick highlighted CLIENT-side and may
+    diff a message edit against the old payload - a redraw that carries the
+    same custom id, options and defaults can leave a refused pick looking
+    accepted (seen live 2026-08-22). Minting a new id on EVERY build makes a
+    redrawn select a genuinely new component, so client-side selection state
+    can never survive a redraw. Safe because panel views are session-bound and
+    re-bound on every render - nothing routes by a stored select id.
+    """
+    return uuid.uuid4().hex[:8]
+
+
 def _select_cid(node_key: str, nonce: Optional[str]) -> str:
     base = cid("editor", "select", node_key)
-    return f"{base}:{nonce}" if nonce else base
+    return f"{base}:{nonce or _select_nonce()}"
 
 
 def build_select_view(
@@ -667,11 +692,11 @@ def build_select_view(
 ) -> discord.ui.LayoutView:
     """Build a select view for a PanelNode with kind in (role_select, channel_select, option_select).
 
-    ``select_nonce`` is appended to the select's custom id. Pass one when the view is
-    being redrawn on the SAME values it already showed (a refused pick): the Discord
-    client only re-renders a component whose payload changed, so an identical select
-    keeps the rejected choice highlighted. Callbacks are bound per component, not
-    routed by custom id, so the suffix changes nothing else.
+    The select's custom id always carries a per-render nonce (a fresh one is
+    minted when ``select_nonce`` is not given - see ``_select_nonce``), so ANY
+    redraw is a genuinely new component and a refused pick can never stay
+    highlighted client-side. Callbacks are bound per component, not routed by
+    custom id, so the suffix changes nothing else.
 
     The component auto-saves on change (no explicit Save button); Back navigates
     to the parent; Clear (if provided) removes all values. ``on_create`` (if
@@ -1253,7 +1278,8 @@ def build_overview_view(
         prev_group = group
     select = discord.ui.Select(
         placeholder="Select a category...",
-        custom_id=cid("dash", "select"),
+        # Fresh per-render id - see _select_nonce.
+        custom_id=f'{cid("dash", "select")}:{_select_nonce()}',
         options=options,
     )
 
@@ -1608,7 +1634,7 @@ def build_dict_key_channel_view(
 
     select_kwargs = dict(
         placeholder="Select a channel...",
-        custom_id=cid("editor", "dict_key_channel", node.key),
+        custom_id=f'{cid("editor", "dict_key_channel", node.key)}:{_select_nonce()}',
         min_values=1,
         max_values=1,
     )
@@ -1684,7 +1710,7 @@ def build_dict_value_role_view(
 
     component = discord.ui.RoleSelect(
         placeholder="Select a role...",
-        custom_id=cid("editor", "dict_value_role", node.key),
+        custom_id=f'{cid("editor", "dict_value_role", node.key)}:{_select_nonce()}',
         min_values=1,
         max_values=1,
         default_values=default_values,

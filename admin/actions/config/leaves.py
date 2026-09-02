@@ -310,6 +310,7 @@ def dict_editor_leaf(key, path, *, label, description="", key_label="Key",
                      premium_label=None, key_kind="text",
                      key_channel_types=None, value_kind="text",
                      key_validator=None, required_channel_perms=None,
+                     value_role_validator=None,
                      counts_as_setting=None) -> PanelNode:
     """dict_editor leaf storing a ``{key: value}`` map at config ``path``.
 
@@ -321,6 +322,10 @@ def dict_editor_leaf(key, path, *, label, description="", key_label="Key",
     on every input path. All four default to the original free-text editor.
     ``required_channel_perms`` (with ``key_kind="channel"``) makes every channel key
     pass the same bot-permission check as a channel_select leaf before it is saved.
+    ``value_role_validator`` (with ``value_kind="role"``) is an async
+    ``(guild, role_id) -> (ok, error_msg)`` business-rule gate on the picked role,
+    run after the assignability check (a native RoleSelect cannot exclude roles,
+    so cross-setting conflicts are refused here instead).
     ``counts_as_setting=False`` excludes the leaf from the category's
     "N of M configured" badge (for optional tuning, e.g. multiplier maps).
     """
@@ -342,6 +347,7 @@ def dict_editor_leaf(key, path, *, label, description="", key_label="Key",
         dict_get_values=_get, dict_set_value=_set, dict_remove_value=_remove,
         dict_key_label=key_label, dict_value_label=value_label,
         dict_value_validator=value_validator, dict_key_validator=key_validator,
+        dict_value_role_validator=value_role_validator,
         dict_max_entries=max_entries,
         dict_key_kind=key_kind, dict_key_channel_types=key_channel_types,
         dict_value_kind=value_kind, required_channel_perms=required_channel_perms,
